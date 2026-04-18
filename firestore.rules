@@ -45,7 +45,6 @@ service cloud.firestore {
           && (data.get('numberPlate', null) == null || data.numberPlate is string)
           && (data.get('availabilityRadius', null) == null || data.availabilityRadius is number)
           && (data.get('avatarUrl', null) == null || data.avatarUrl is string)
-          && (data.get('updatedAt', null) == null || data.updatedAt == request.time)
           && (data.get('isOnline', null) == null || data.isOnline is bool)
           && (data.get('badges', null) == null || data.badges is list)
           && (data.get('favoriteUserIds', null) == null || data.favoriteUserIds is list)
@@ -58,8 +57,10 @@ service cloud.firestore {
 
       allow get: if isSignedIn();
       allow list: if isSignedIn() && resource.data.role == 'rider' && resource.data.isOnline == true;
-      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow create: if isOwner(userId) && isValidUser(incoming())
+        && (incoming().get('updatedAt', null) == null || incoming().updatedAt == request.time);
       allow update: if isOwner(userId) && isValidUser(incoming())
+        && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'name', 'avatarUrl', 'rating', 'totalTrips', 'isOnline', 'currentLocation', 'badges', 
           'phoneNumber', 'gender', 'dob', 'vehicleType', 'licenseClass', 'vehicleModel', 
@@ -87,7 +88,6 @@ service cloud.firestore {
           && (data.get('riderConfirmedStart', null) == null || data.riderConfirmedStart is bool)
           && (data.get('riderConfirmedEnd', null) == null || data.riderConfirmedEnd is bool)
           && (data.get('isOnTime', null) == null || data.isOnTime is bool)
-          && (data.get('updatedAt', null) == null || data.updatedAt == request.time)
           && data.createdAt == request.time;
       }
 
@@ -109,7 +109,9 @@ service cloud.firestore {
 
       allow create: if isSignedIn() && isOwner(incoming().passengerId) && isValidRide(incoming());
 
-      allow update: if isSignedIn() && (
+      allow update: if isSignedIn() 
+        && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
+        && (
         // Action: Cancel (Passenger)
         (isOwner(existing().passengerId) && existing().status == 'requested' && incoming().status == 'cancelled' && (
           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
