@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile } from '../lib/firebase';
+import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus } from '../lib/firebase';
 import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
@@ -57,9 +57,11 @@ export default function RiderDashboard({ user, profile }: Props) {
 
     // Subscribe to rides accepted by me
     const subMyRides = subscribeToUserRides(user.uid, 'rider', (rides) => {
-      const active = rides.find(r => ['accepted', 'ongoing'].includes(r.status));
+      const active = rides.find(r => ['accepted', 'arrived', 'ongoing'].includes(r.status));
       if (active && active.status !== lastStatusRef.current) {
-        if (active.status === 'ongoing') {
+        if (active.status === 'arrived') {
+          addNotification('Arrived!', 'You have marked yourself as arrived at the pickup location.', 'info');
+        } else if (active.status === 'ongoing') {
           addNotification('Trip In Progress', 'You have started the ride with the passenger.', 'info');
         }
         lastStatusRef.current = active.status;
@@ -73,22 +75,27 @@ export default function RiderDashboard({ user, profile }: Props) {
     };
   }, [user.uid, addNotification]);
 
-  // Real-time location tracking mock
+  // Real-time location tracking using Geolocation API
   useEffect(() => {
-    if (!activeRide) return;
+    if (!("geolocation" in navigator)) return;
 
-    let lat = 51.5074;
-    let lng = -0.1278;
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        updateUserLocation(user.uid, latitude, longitude).catch(console.error);
+      },
+      (error) => {
+        console.error("Error tracking location:", error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000,
+        timeout: 10000
+      }
+    );
 
-    const interval = setInterval(() => {
-      // Mock slight movement
-      lat += (Math.random() - 0.5) * 0.001;
-      lng += (Math.random() - 0.5) * 0.001;
-      updateUserLocation(user.uid, lat, lng).catch(console.error);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [activeRide, user.uid]);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user.uid]);
 
   useEffect(() => {
     if (activeRide?.passengerId) {
@@ -124,7 +131,22 @@ export default function RiderDashboard({ user, profile }: Props) {
 
   const handleNextStep = async () => {
     if (!activeRide) return;
-    const nextStatus = activeRide.status === 'accepted' ? 'ongoing' : 'completed';
+    let nextStatus: RideStatus;
+    
+    switch (activeRide.status) {
+      case 'accepted':
+        nextStatus = 'arrived';
+        break;
+      case 'arrived':
+        nextStatus = 'ongoing';
+        break;
+      case 'ongoing':
+        nextStatus = 'completed';
+        break;
+      default:
+        return;
+    }
+
     try {
       await updateRideStatus(activeRide.id, nextStatus);
     } catch (error) {
@@ -159,7 +181,7 @@ export default function RiderDashboard({ user, profile }: Props) {
                     {activeRide.status}
                   </div>
                   <h3 className="text-4xl font-bold mb-2">
-                    {activeRide.status === 'accepted' ? 'Heading to pickup' : 'Heading to destination'}
+                    {activeRide.status === 'accepted' ? 'Heading to pickup' : activeRide.status === 'arrived' ? 'Waiting at pickup' : 'Heading to destination'}
                   </h3>
                   {passengerProfile && (
                       <p className="text-sm font-medium text-white/60">
@@ -199,7 +221,7 @@ export default function RiderDashboard({ user, profile }: Props) {
               onClick={handleNextStep}
               className="w-full bg-white text-black py-5 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition-all active:scale-[0.98]"
             >
-              {activeRide.status === 'accepted' ? 'Arrived at Pickup' : 'Complete Ride'}
+              {activeRide.status === 'accepted' ? 'I have Arrived' : activeRide.status === 'arrived' ? 'Start Trip' : 'Complete Ride'}
               <ArrowRight className="w-6 h-6" />
             </button>
           </div>

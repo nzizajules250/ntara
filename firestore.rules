@@ -53,7 +53,7 @@ service cloud.firestore {
       }
 
       allow get: if isSignedIn();
-      allow list: if false; // Users shouldn't be searchable in bulk
+      allow list: if isSignedIn() && resource.data.role == 'rider' && resource.data.isOnline == true;
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if isOwner(userId) && isValidUser(incoming())
         && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatarUrl', 'rating', 'totalTrips', 'isOnline', 'currentLocation', 'badges', 'phoneNumber', 'gender', 'dob', 'vehicleType', 'licenseClass', 'vehicleModel', 'numberPlate', 'favoriteUserIds', 'emergencyContact']);
@@ -63,7 +63,7 @@ service cloud.firestore {
     match /rides/{rideId} {
       function isValidRide(data) {
         return data.passengerId == request.auth.uid
-          && data.status in ['requested', 'accepted', 'ongoing', 'completed', 'cancelled']
+          && data.status in ['requested', 'accepted', 'arrived', 'ongoing', 'completed', 'cancelled']
           && data.fare is number && data.fare >= 0
           && data.pickup.address is string && data.pickup.address.size() <= 200
           && data.destination.address is string && data.destination.address.size() <= 200
@@ -100,7 +100,8 @@ service cloud.firestore {
         
         // Action: Start/Complete (Rider)
         (isOwner(existing().riderId) && (
-          (existing().status == 'accepted' && incoming().status == 'ongoing') ||
+          (existing().status == 'accepted' && incoming().status == 'arrived') ||
+          (existing().status == 'arrived' && incoming().status == 'ongoing') ||
           (existing().status == 'ongoing' && incoming().status == 'completed')
         ) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
         

@@ -90,9 +90,20 @@ export default function App() {
               </div>
               <button 
                 onClick={() => setView('profile')}
-                className={`p-2 rounded-full transition-colors ${view === 'profile' ? 'bg-black dark:bg-white text-white dark:text-black' : 'hover:bg-gray-100 dark:hover:bg-zinc-800'}`}
+                className={`transition-all active:scale-95 ${view === 'profile' ? 'ring-2 ring-black dark:ring-white ring-offset-2 dark:ring-offset-zinc-900 rounded-full' : ''}`}
               >
-                <UserIcon className={`w-5 h-5 ${view === 'profile' ? 'text-white dark:text-black' : 'text-gray-500 dark:text-gray-400'}`} />
+                {profile.avatarUrl ? (
+                  <img 
+                    src={profile.avatarUrl} 
+                    alt={profile.name} 
+                    referrerPolicy="no-referrer" 
+                    className="w-9 h-9 rounded-full object-cover border border-gray-100 dark:border-zinc-800 shadow-sm" 
+                  />
+                ) : (
+                  <div className={`p-2 rounded-full transition-colors ${view === 'profile' ? 'bg-black dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                )}
               </button>
             </div>
           </div>
@@ -154,7 +165,11 @@ export default function App() {
             onClick={() => setView('profile')}
             className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium transition-all ${view === 'profile' ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg' : 'dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}
           >
-            <UserIcon className="w-5 h-5" />
+            {profile.avatarUrl ? (
+              <img src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" className={`w-5 h-5 rounded-full object-cover transition-all ${view === 'profile' ? 'ring-1 ring-white dark:ring-black' : ''}`} />
+            ) : (
+              <UserIcon className="w-5 h-5" />
+            )}
             <span>Profile</span>
           </button>
         </div>

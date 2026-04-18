@@ -1,6 +1,6 @@
 import { useState, useEffect, MouseEvent, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db } from '../lib/firebase';
+import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db, subscribeToOnlineRiders } from '../lib/firebase';
 import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
@@ -18,6 +18,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [completedRide, setCompletedRide] = useState<Ride | null>(null);
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
+  const [onlineRiders, setOnlineRiders] = useState<UserProfile[]>([]);
   const lastStatusRef = useRef<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
@@ -117,13 +118,27 @@ export default function PassengerDashboard({ user, profile }: Props) {
   }, [pickup, destination, appliedPromo]);
 
   useEffect(() => {
+    // Only subscribe to all online riders if we don't have an active ride
+    if (!activeRide) {
+      const unsubscribe = subscribeToOnlineRiders((riders) => {
+        setOnlineRiders(riders);
+      });
+      return unsubscribe;
+    } else {
+      setOnlineRiders([]);
+    }
+  }, [activeRide]);
+
+  useEffect(() => {
     const unsubscribe = subscribeToUserRides(user.uid, 'passenger', (rides) => {
-      const active = rides.find(r => ['requested', 'accepted', 'ongoing'].includes(r.status));
+      const active = rides.find(r => ['requested', 'accepted', 'arrived', 'ongoing'].includes(r.status));
       const justCompleted = rides.find(r => r.status === 'completed' && !r.riderRating);
       
       if (active && active.status !== lastStatusRef.current) {
         if (active.status === 'accepted') {
           addNotification('Ride Accepted!', 'A rider is on the way to your location.', 'ride_accepted');
+        } else if (active.status === 'arrived') {
+          addNotification('Rider Arrived!', 'Your rider has arrived at the pickup location.', 'ride_accepted');
         } else if (active.status === 'ongoing') {
           addNotification('Ride Started', 'You are now on your way to the destination.', 'info');
         }
@@ -320,6 +335,25 @@ export default function PassengerDashboard({ user, profile }: Props) {
               <div className="absolute inset-0 border border-white/10" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
             </div>
             
+            {/* Online Riders (only if status is requested) */}
+            {activeRide.status === 'requested' && onlineRiders.map((rider) => (
+              <motion.div 
+                key={rider.uid}
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: 1,
+                  x: rider.currentLocation ? (rider.currentLocation.lng + 0.1278) * 1000 * 5 : 0, 
+                  y: rider.currentLocation ? (rider.currentLocation.lat - 51.5074) * 1000 * 5 : 0 
+                }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
+              >
+                <div className="w-4 h-4 bg-emerald-500/40 rounded-full flex items-center justify-center border border-emerald-400">
+                  <Navigation2 className="w-2 h-2 text-emerald-400 fill-current" />
+                </div>
+              </motion.div>
+            ))}
+
             {/* Real-time traffic mock line */}
             {showTraffic && (
               <>
@@ -401,7 +435,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                   {activeRide.status}
                 </div>
                 <h3 className="text-3xl font-bold mb-2 leading-tight">
-                  {activeRide.status === 'requested' ? 'Finding a rider...' : activeRide.status === 'accepted' ? 'Rider is on the way' : 'Your ride is ongoing'}
+                  {activeRide.status === 'requested' ? 'Finding a rider...' : activeRide.status === 'accepted' ? 'Rider is on the way' : activeRide.status === 'arrived' ? 'Rider has arrived' : 'Your ride is ongoing'}
                 </h3>
               </div>
               

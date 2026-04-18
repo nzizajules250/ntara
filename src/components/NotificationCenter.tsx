@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bell, X, CheckCircle2, AlertCircle, Info, Car, Navigation2 } from 'lucide-react';
+import { requestNotificationPermission, sendPushNotification } from '../lib/pushNotifications';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'ride_request' | 'ride_accepted';
 
@@ -42,15 +43,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
     setNotifications((prev) => [newNotification, ...prev]);
 
+    // Send native push notification
+    sendPushNotification(title, { body: message });
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
       removeNotification(id);
     }, 5000);
-
-    // Try browser notification if permitted
-    if (Notification.permission === 'granted') {
-      new Notification(title, { body: message });
-    }
   };
 
   const removeNotification = (id: string) => {
@@ -58,9 +57,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    requestNotificationPermission();
   }, []);
 
   return (
