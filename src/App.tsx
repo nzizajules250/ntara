@@ -207,7 +207,37 @@ function AppContent() {
           </div>
         </nav>
 
-        <main className="max-w-3xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pb-8">
+        <div className="hidden lg:block max-w-3xl mx-auto px-6 pt-5">
+          <div className="flex items-center justify-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-xl shadow-black/10 backdrop-blur-xl">
+            <button 
+              onClick={() => setView('dashboard')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'dashboard' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <Smartphone className="w-5 h-5" />
+              <span>{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
+            </button>
+            <button 
+              onClick={() => setView('history')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'history' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <History className="w-5 h-5" />
+              <span>{t('history')}</span>
+            </button>
+            <button 
+              onClick={() => setView('profile')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'profile' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" className={`h-5 w-5 rounded-full object-cover transition-all ${view === 'profile' ? 'ring-1 ring-zinc-950' : 'ring-1 ring-transparent'}`} />
+              ) : (
+                <UserIcon className="w-5 h-5" />
+              )}
+              <span>{t('profile')}</span>
+            </button>
+          </div>
+        </div>
+
+        <main className="max-w-3xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pt-5 lg:pb-10">
           <AnimatePresence mode="wait">
             {view === 'dashboard' ? (
               <motion.div
@@ -271,34 +301,6 @@ function AppContent() {
           </div>
         </div>
 
-        {/* Desktop Bottom Navigation */}
-        <div className="hidden lg:flex fixed right-6 bottom-6 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-2xl shadow-black/20 backdrop-blur-xl z-50 max-w-[calc(100vw-3rem)]">
-          <button 
-            onClick={() => setView('dashboard')}
-            className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'dashboard' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-          >
-            <Smartphone className="w-5 h-5" />
-            <span>{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
-          </button>
-          <button 
-            onClick={() => setView('history')}
-            className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'history' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-          >
-            <History className="w-5 h-5" />
-            <span>{t('history')}</span>
-          </button>
-          <button 
-            onClick={() => setView('profile')}
-            className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'profile' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-          >
-            {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" className={`h-5 w-5 rounded-full object-cover transition-all ${view === 'profile' ? 'ring-1 ring-zinc-950' : 'ring-1 ring-transparent'}`} />
-            ) : (
-              <UserIcon className="w-5 h-5" />
-            )}
-            <span>{t('profile')}</span>
-          </button>
-        </div>
       </div>
     </NotificationProvider>
   );

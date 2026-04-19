@@ -147,10 +147,12 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         className="w-full max-w-lg bg-white rounded-[2.5rem] p-8 shadow-2xl border border-gray-100"
       >
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl">
-            <Car className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 leading-tight">SwiftRide</h1>
+          <img
+            src="/ntwara-logo.png"
+            alt="Ntwara"
+            className="h-20 sm:h-24 w-auto object-contain mx-auto mb-4"
+          />
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">Ntwara</h1>
           <p className="text-gray-500 font-medium">{t('empoweringJourney')}</p>
         </div>
 
