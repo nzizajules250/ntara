@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Default deny
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
 
     // Helper functions
@@ -46,8 +46,10 @@ service cloud.firestore {
           && (data.get('availabilityRadius', null) == null || data.availabilityRadius is number)
           && (data.get('avatarUrl', null) == null || data.avatarUrl is string)
           && (data.get('isOnline', null) == null || data.isOnline is bool)
+          && (data.get('status', null) == null || data.status in ['active', 'inactive', 'riding'])
           && (data.get('badges', null) == null || data.badges is list)
           && (data.get('favoriteUserIds', null) == null || data.favoriteUserIds is list)
+          && (data.get('savedLocations', null) == null || data.savedLocations is list)
           && (data.get('currentLocation', null) == null || (data.currentLocation.lat is number && data.currentLocation.lng is number))
           && (data.get('emergencyContact', null) == null || (
               data.emergencyContact.name is string && data.emergencyContact.name.size() > 0 
@@ -65,7 +67,7 @@ service cloud.firestore {
           'name', 'avatarUrl', 'rating', 'totalTrips', 'isOnline', 'currentLocation', 'badges', 
           'phoneNumber', 'gender', 'dob', 'vehicleType', 'licenseClass', 'vehicleModel', 
           'numberPlate', 'favoriteUserIds', 'emergencyContact', 'uid', 'email', 'availabilityRadius',
-          'updatedAt'
+          'status', 'savedLocations', 'updatedAt'
         ]);
     }
 

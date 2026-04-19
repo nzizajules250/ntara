@@ -1,7 +1,7 @@
 import { useState, useEffect, MouseEvent, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db, subscribeToOnlineRiders } from '../lib/firebase';
-import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone } from 'lucide-react';
+import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
+import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -21,6 +21,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [completedRide, setCompletedRide] = useState<Ride | null>(null);
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
   const [onlineRiders, setOnlineRiders] = useState<UserProfile[]>([]);
+  const [nearbyDrivers, setNearbyDrivers] = useState<UserProfile[]>([]);
   const lastStatusRef = useRef<string | null>(null);
   const [isRequesting, setIsRequesting] = useState(false);
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
@@ -47,6 +48,55 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [isPickingOnMap, setIsPickingOnMap] = useState<'pickup' | 'destination' | null>(null);
   const [passengerLocation, setPassengerLocation] = useState<{lat: number, lng: number} | null>(null);
   const [showTraffic, setShowTraffic] = useState(true);
+  
+  // Saved Locations
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(profile.savedLocations || []);
+  const [showSaveLocationModal, setShowSaveLocationModal] = useState(false);
+  const [locationNameToSave, setLocationNameToSave] = useState('');
+  const [isSavingLocation, setIsSavingLocation] = useState(false);
+
+  const handleSaveLocation = async (address: string, lat: number, lng: number) => {
+    if (!locationNameToSave.trim()) {
+      addNotification('Error', 'Please enter a name for this location', 'error');
+      return;
+    }
+    
+    setIsSavingLocation(true);
+    try {
+      await saveLocation(user.uid, {
+        name: locationNameToSave,
+        address,
+        lat,
+        lng
+      });
+      setSavedLocations([...savedLocations, {
+        id: `${Date.now()}`,
+        name: locationNameToSave,
+        address,
+        lat,
+        lng
+      }]);
+      addNotification('Location Saved', `${locationNameToSave} has been saved to your favorites`, 'success');
+      setShowSaveLocationModal(false);
+      setLocationNameToSave('');
+    } catch (e) {
+      console.error(e);
+      addNotification('Error', 'Failed to save location', 'error');
+    } finally {
+      setIsSavingLocation(false);
+    }
+  };
+
+  const handleRemoveSavedLocation = async (locationId: string) => {
+    try {
+      await removeSavedLocation(user.uid, locationId);
+      setSavedLocations(savedLocations.filter(loc => loc.id !== locationId));
+      addNotification('Location Removed', 'Saved location has been deleted', 'success');
+    } catch (e) {
+      console.error(e);
+      addNotification('Error', 'Failed to remove location', 'error');
+    }
+  };
 
   const handleToggleFavorite = async (targetUserId: string) => {
     const isFavorite = profile.favoriteUserIds?.includes(targetUserId);
@@ -133,6 +183,26 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setOnlineRiders([]);
     }
   }, [activeRide]);
+
+  // Load nearby drivers when ride is active and passenger location is known
+  useEffect(() => {
+    if (activeRide && passengerLocation && activeRide.status === 'requested') {
+      const loadNearbyDrivers = async () => {
+        try {
+          const drivers = await getNearbyDrivers(passengerLocation.lat, passengerLocation.lng, 10);
+          setNearbyDrivers(drivers);
+        } catch (error) {
+          console.error('Failed to load nearby drivers:', error);
+        }
+      };
+      
+      loadNearbyDrivers();
+      const interval = setInterval(loadNearbyDrivers, 5000); // Refresh every 5 seconds
+      return () => clearInterval(interval);
+    } else {
+      setNearbyDrivers([]);
+    }
+  }, [activeRide, passengerLocation]);
 
   useEffect(() => {
     const unsubscribe = subscribeToUserRides(user.uid, 'passenger', (rides) => {
@@ -592,6 +662,54 @@ export default function PassengerDashboard({ user, profile }: Props) {
               </div>
             </div>
 
+            {/* Nearby Drivers Section - Show when ride is requested and status is active */}
+            {activeRide.status === 'requested' && nearbyDrivers.length > 0 && (
+              <div className="pt-6 border-t border-white/10">
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-4">Nearby Drivers ({nearbyDrivers.length})</p>
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  {nearbyDrivers.slice(0, 5).map((driver) => (
+                    <motion.div 
+                      key={driver.uid}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 flex items-center justify-between border border-white/10 hover:border-white/20 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {driver.avatarUrl ? (
+                          <img src={driver.avatarUrl} className="w-10 h-10 rounded-xl object-cover" alt="" />
+                        ) : (
+                          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                            <UserIcon className="w-5 h-5 text-white/40" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-white truncate">{driver.name}</p>
+                            <div className="flex items-center gap-1 text-amber-400 text-[10px] font-bold">
+                              <Star className="w-3 h-3 fill-current" />
+                              {driver.rating}
+                            </div>
+                          </div>
+                          {driver.phoneNumber && (
+                            <p className="text-[10px] text-white/40 font-medium">{driver.phoneNumber}</p>
+                          )}
+                        </div>
+                      </div>
+                      {driver.phoneNumber && (
+                        <a 
+                          href={`tel:${driver.phoneNumber}`}
+                          className="ml-3 p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors active:scale-95 flex-shrink-0"
+                          title="Call driver"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="pt-6 border-t border-white/10 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -947,33 +1065,116 @@ export default function PassengerDashboard({ user, profile }: Props) {
         )}
       </button>
 
-      {/* Suggested Locations */}
+      {/* Saved Locations */}
       <div className="space-y-4">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 px-4">{t('savedLocations')}</h3>
-        <div className="grid gap-2">
-          {[
-            { name: "Coffee Central", address: "123 Brew St, Downtown", icon: Clock },
-            { name: "Global Office", address: "Tech Park II, Unit 4B", icon: ShieldCheck }
-          ].map((loc, i) => (
-            <button 
-              key={i}
-              onClick={() => { setPickup("Search Location"); setDestination(loc.address); }}
-              className="w-full text-left bg-white p-5 rounded-[1.5rem] border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group shadow-sm"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                  <loc.icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">{loc.name}</p>
-                  <p className="text-xs text-gray-400 font-medium">{loc.address}</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-black transition-colors" />
-            </button>
-          ))}
+        <div className="flex items-center justify-between px-2">
+          <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">{t('savedLocations')}</h3>
+          <button
+            onClick={() => {
+              if (destination) {
+                setLocationNameToSave('');
+                setShowSaveLocationModal(true);
+              } else {
+                addNotification('Info', 'Set a destination first to save this location', 'info');
+              }
+            }}
+            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Save current destination"
+          >
+            <Save className="w-4 h-4" />
+          </button>
         </div>
+        
+        {savedLocations.length > 0 ? (
+          <div className="grid gap-2">
+            {savedLocations.map((loc) => (
+              <button 
+                key={loc.id}
+                onClick={() => { setDestination(loc.address); }}
+                className="w-full text-left bg-white p-5 rounded-3xl border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group shadow-sm"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">{loc.name}</p>
+                    <p className="text-xs text-gray-400 font-medium">{loc.address}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveSavedLocation(loc.id);
+                  }}
+                  className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400 px-4">No saved locations yet. Add one to get started!</p>
+        )}
       </div>
+
+      {/* Save Location Modal */}
+      <AnimatePresence>
+        {showSaveLocationModal && (
+          <div className="fixed inset-0 z-100 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowSaveLocationModal(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-3xl p-8 relative z-10 shadow-2xl"
+            >
+              <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                <MapPinPlus className="w-6 h-6" />
+                Save Location
+              </h3>
+              <p className="text-gray-500 mb-6">Save "{destination}" as a favorite location</p>
+              
+              <input 
+                type="text"
+                value={locationNameToSave}
+                onChange={(e) => setLocationNameToSave(e.target.value)}
+                placeholder="e.g., Home, Work, Gym"
+                className="w-full bg-gray-50 rounded-2xl p-4 border-none focus:ring-2 focus:ring-black outline-none mb-6 resize-none"
+              />
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowSaveLocationModal(false)}
+                  className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (passengerLocation) {
+                      handleSaveLocation(destination, passengerLocation.lat, passengerLocation.lng);
+                    } else {
+                      handleSaveLocation(destination, 51.5074, -0.1278);
+                    }
+                  }}
+                  disabled={isSavingLocation}
+                  className="flex-1 bg-black text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSavingLocation ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

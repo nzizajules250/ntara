@@ -48,6 +48,15 @@ export function handleFirestoreError(error: any, operationType: FirestoreErrorIn
 
 export type UserRole = 'passenger' | 'rider';
 
+export interface SavedLocation {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  createdAt?: any;
+}
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -58,6 +67,7 @@ export interface UserProfile {
   totalTrips: number;
   avatarUrl?: string;
   isOnline?: boolean;
+  status?: 'active' | 'inactive' | 'riding';
   badges?: string[];
   currentLocation?: { lat: number; lng: number };
   gender?: string;
@@ -68,6 +78,7 @@ export interface UserProfile {
   numberPlate?: string;
   availabilityRadius?: number;
   favoriteUserIds?: string[];
+  savedLocations?: SavedLocation[];
   emergencyContact?: {
     name: string;
     phone: string;
@@ -299,4 +310,88 @@ export function subscribeToOnlineRiders(callback: (riders: UserProfile[]) => voi
     },
     (error) => handleFirestoreError(error, 'list', 'users')
   );
+}
+// Saved Locations Functions
+export async function saveLocation(uid: string, location: Omit<SavedLocation, 'id'>): Promise<void> {
+  try {
+    const user = doc(db, 'users', uid);
+    const userDoc = await getDoc(user);
+    
+    if (!userDoc.exists()) throw new Error('User not found');
+    
+    const newLocation: SavedLocation = {
+      id: `${Date.now()}`,
+      ...location,
+      createdAt: serverTimestamp()
+    };
+    
+    await updateDoc(user, {
+      savedLocations: arrayUnion(newLocation)
+    });
+  } catch (error) {
+    return handleFirestoreError(error, 'update', `users/${uid}/savedLocations`);
+  }
+}
+
+export async function removeSavedLocation(uid: string, locationId: string): Promise<void> {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (!userDoc.exists()) throw new Error('User not found');
+    
+    const currentLocations = (userDoc.data().savedLocations || []) as SavedLocation[];
+    const locationToRemove = currentLocations.find(loc => loc.id === locationId);
+    
+    if (locationToRemove) {
+      await updateDoc(doc(db, 'users', uid), {
+        savedLocations: arrayRemove(locationToRemove)
+      });
+    }
+  } catch (error) {
+    return handleFirestoreError(error, 'update', `users/${uid}/savedLocations`);
+  }
+}
+
+// Driver Status Functions
+export async function updateDriverStatus(uid: string, status: 'active' | 'inactive' | 'riding'): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      status,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    return handleFirestoreError(error, 'update', `users/${uid}`);
+  }
+}
+
+// Get nearby drivers by radius
+export async function getNearbyDrivers(
+  passengerLat: number,
+  passengerLng: number,
+  radiusInKm: number = 5
+): Promise<UserProfile[]> {
+  try {
+    // Get all active drivers
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'rider'),
+      where('isOnline', '==', true),
+      where('status', '==', 'active')
+    );
+    
+    const snapshot = await getDocs(q);
+    const drivers = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
+    
+    // Filter by distance
+    return drivers.filter(driver => {
+      if (!driver.currentLocation) return false;
+      
+      const latDiff = Math.abs(driver.currentLocation.lat - passengerLat);
+      const lngDiff = Math.abs(driver.currentLocation.lng - passengerLng);
+      const distanceInKm = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lngDiff, 2)) * 111;
+      
+      return distanceInKm <= radiusInKm;
+    });
+  } catch (error) {
+    return handleFirestoreError(error, 'list', 'users');
+  }
 }

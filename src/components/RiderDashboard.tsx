@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus } from '../lib/firebase';
+import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus, updateDriverStatus } from '../lib/firebase';
 import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
@@ -88,6 +88,18 @@ export default function RiderDashboard({ user, profile }: Props) {
       subMyRides();
     };
   }, [user.uid, addNotification, profile.availabilityRadius, profile.currentLocation]);
+
+  // Update driver status based on active ride
+  useEffect(() => {
+    if (!activeRide) {
+      // Driver is available and not in an active ride
+      updateDriverStatus(user.uid, 'active').catch(console.error);
+    } else {
+      // Driver is currently in an active ride
+      updateDriverStatus(user.uid, 'riding').catch(console.error);
+    }
+  }, [activeRide, user.uid]);
+
 
   // Real-time location tracking using Geolocation API
   useEffect(() => {
