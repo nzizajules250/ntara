@@ -13,6 +13,12 @@ interface Props {
   profile: UserProfile;
 }
 
+const hasValidCoordinates = (point?: { lat: number; lng: number } | null) =>
+  !!point &&
+  Number.isFinite(point.lat) &&
+  Number.isFinite(point.lng) &&
+  (point.lat !== 0 || point.lng !== 0);
+
 export default function PassengerDashboard({ user, profile }: Props) {
   const { t } = useLanguage();
   const { addNotification } = useNotifications();
@@ -29,6 +35,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedNearbyRiderId, setSelectedNearbyRiderId] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [ratingReason, setRatingReason] = useState<RatingReason | ''>('');
   const [isRating, setIsRating] = useState(false);
@@ -186,10 +193,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
   // Load nearby drivers when ride is active and passenger location is known
   useEffect(() => {
-    if (activeRide && passengerLocation && activeRide.status === 'requested') {
+    const ridePickupLocation =
+      passengerLocation ||
+      (activeRide && hasValidCoordinates(activeRide.pickup)
+        ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng }
+        : null);
+
+    if (activeRide && ridePickupLocation && activeRide.status === 'requested') {
       const loadNearbyDrivers = async () => {
         try {
-          const drivers = await getNearbyDrivers(passengerLocation.lat, passengerLocation.lng, 10);
+          const drivers = await getNearbyDrivers(ridePickupLocation.lat, ridePickupLocation.lng, 10);
           setNearbyDrivers(drivers);
         } catch (error) {
           console.error('Failed to load nearby drivers:', error);
@@ -232,10 +245,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
   }, [user.uid, addNotification]);
 
   useEffect(() => {
-    if (activeRide?.status === 'accepted' && riderProfile?.currentLocation && passengerLocation) {
+    const ridePickupLocation =
+      passengerLocation ||
+      (activeRide && hasValidCoordinates(activeRide.pickup)
+        ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng }
+        : null);
+
+    if (activeRide?.status === 'accepted' && riderProfile?.currentLocation && ridePickupLocation) {
       // Basic distance calculation for ETA (roughly 2 mins per 0.01 lat/lng diff)
-      const latDiff = Math.abs(riderProfile.currentLocation.lat - passengerLocation.lat);
-      const lngDiff = Math.abs(riderProfile.currentLocation.lng - passengerLocation.lng);
+      const latDiff = Math.abs(riderProfile.currentLocation.lat - ridePickupLocation.lat);
+      const lngDiff = Math.abs(riderProfile.currentLocation.lng - ridePickupLocation.lng);
       const distance = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lngDiff, 2));
       const estimatedMinutes = Math.max(1, Math.round(distance * 200)); 
       setEta(estimatedMinutes);
@@ -243,6 +262,19 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setEta(null);
     }
   }, [activeRide?.status, riderProfile?.currentLocation, passengerLocation]);
+
+  useEffect(() => {
+    if (!passengerLocation && activeRide && hasValidCoordinates(activeRide.pickup)) {
+      setPassengerLocation({ lat: activeRide.pickup.lat, lng: activeRide.pickup.lng });
+    }
+  }, [activeRide, passengerLocation]);
+
+  useEffect(() => {
+    const riderStillVisible = [...onlineRiders, ...nearbyDrivers].some((rider) => rider.uid === selectedNearbyRiderId);
+    if (selectedNearbyRiderId && !riderStillVisible) {
+      setSelectedNearbyRiderId(null);
+    }
+  }, [onlineRiders, nearbyDrivers, selectedNearbyRiderId]);
 
   // Track rider profile when accepted
   useEffect(() => {
@@ -328,7 +360,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   };
 
   const handleConfirmArrival = async () => {
-    if (!activeRide) return;
+    if (!activeRide || activeRide.status !== 'arrived' || activeRide.passengerConfirmedArrival) return;
     try {
       await updateDoc(doc(db, 'rides', activeRide.id), {
         passengerConfirmedArrival: true,
@@ -340,7 +372,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   };
 
   const handleConfirmStart = async () => {
-    if (!activeRide) return;
+    if (!activeRide || activeRide.status !== 'arrived' || !activeRide.passengerConfirmedArrival || !activeRide.riderConfirmedStart || activeRide.passengerConfirmedStart) return;
     try {
       await updateDoc(doc(db, 'rides', activeRide.id), {
         passengerConfirmedStart: true,
@@ -352,8 +384,31 @@ export default function PassengerDashboard({ user, profile }: Props) {
     } catch (e) { console.error(e); }
   };
 
+  const handleRejectArrival = async () => {
+    if (!activeRide || activeRide.status !== 'arrived' || activeRide.passengerConfirmedArrival) return;
+    try {
+      await updateDoc(doc(db, 'rides', activeRide.id), {
+        status: 'accepted',
+        riderConfirmedStart: false,
+        updatedAt: serverTimestamp()
+      });
+      addNotification('Arrival rejected', 'The rider was sent back to the on-the-way stage until they really reach you.', 'info');
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRejectStart = async () => {
+    if (!activeRide || activeRide.status !== 'arrived' || !activeRide.riderConfirmedStart || activeRide.passengerConfirmedStart) return;
+    try {
+      await updateDoc(doc(db, 'rides', activeRide.id), {
+        riderConfirmedStart: false,
+        updatedAt: serverTimestamp()
+      });
+      addNotification('Start rejected', 'Trip start approval was removed until the rider actually begins the trip with you.', 'info');
+    } catch (e) { console.error(e); }
+  };
+
   const handleConfirmReached = async () => {
-    if (!activeRide) return;
+    if (!activeRide || activeRide.status !== 'ongoing' || !activeRide.riderConfirmedEnd || activeRide.passengerConfirmedEnd) return;
     try {
       await updateDoc(doc(db, 'rides', activeRide.id), {
         passengerConfirmedEnd: true,
@@ -361,6 +416,17 @@ export default function PassengerDashboard({ user, profile }: Props) {
         completedAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRejectReached = async () => {
+    if (!activeRide || activeRide.status !== 'ongoing' || !activeRide.riderConfirmedEnd || activeRide.passengerConfirmedEnd) return;
+    try {
+      await updateDoc(doc(db, 'rides', activeRide.id), {
+        riderConfirmedEnd: false,
+        updatedAt: serverTimestamp()
+      });
+      addNotification('Destination rejected', 'The ride stays active until you confirm you have really arrived.', 'info');
     } catch (e) { console.error(e); }
   };
 
@@ -446,6 +512,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
   }
 
   if (activeRide) {
+    const ridePickupLocation =
+      passengerLocation ||
+      (hasValidCoordinates(activeRide.pickup)
+        ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng }
+        : null);
+    const focusedNearbyDriver =
+      nearbyDrivers.find((driver) => driver.uid === selectedNearbyRiderId && hasValidCoordinates(driver.currentLocation)) || null;
+    const waitingForRiderStart = activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && !activeRide.riderConfirmedStart;
+    const waitingForRiderEndSignal = activeRide.status === 'ongoing' && !activeRide.riderConfirmedEnd;
+
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">Active Ride</h2>
@@ -455,12 +531,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
           animate={{ opacity: 1, scale: 1 }}
           className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
         >
-          {passengerLocation && (
+          {ridePickupLocation && (
             <MapComponent 
               markers={[
                 {
                   id: 'passenger',
-                  position: passengerLocation,
+                  position: ridePickupLocation,
                   label: 'You',
                   type: 'passenger'
                 },
@@ -481,9 +557,15 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     profile: driver
                   })) : [])
               ]}
-              center={riderProfile?.currentLocation || passengerLocation}
+              center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
               zoom={15}
               height="384px"
+              showNearbyDrivers={activeRide.status === 'requested'}
+              onMarkerClick={(marker) => {
+                if (marker.type === 'nearby') {
+                  setSelectedNearbyRiderId(marker.id);
+                }
+              }}
             />
           )}
 
@@ -607,7 +689,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       key={driver.uid}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 flex items-center justify-between border border-white/10 hover:border-white/20 transition-all"
+                      onClick={() => setSelectedNearbyRiderId(driver.uid)}
+                      className={`bg-white/10 backdrop-blur-sm rounded-2xl p-4 flex items-center justify-between border transition-all cursor-pointer ${selectedNearbyRiderId === driver.uid ? 'border-emerald-400/60 bg-emerald-500/10' : 'border-white/10 hover:border-white/20'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {driver.avatarUrl ? (
@@ -642,6 +725,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       {driver.phoneNumber && (
                         <a 
                           href={`tel:${driver.phoneNumber}`}
+                          onClick={(e) => e.stopPropagation()}
                           className="ml-3 p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors active:scale-95 flex-shrink-0"
                           title="Call driver"
                         >
@@ -667,7 +751,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     )}
                   </div>
                 </div>
-                {activeRide.status === 'requested' && (
+                {['requested', 'accepted', 'arrived'].includes(activeRide.status) && (
                   <button 
                     onClick={() => setShowCancelModal(true)}
                     className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-2xl font-bold transition-colors"
@@ -680,33 +764,72 @@ export default function PassengerDashboard({ user, profile }: Props) {
               {/* Handshake Buttons */}
               <div className="flex flex-col gap-2">
                 {activeRide.status === 'arrived' && !activeRide.passengerConfirmedArrival && (
-                  <button 
-                    onClick={handleConfirmArrival}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Confirm Driver Arrival
-                  </button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button 
+                      onClick={handleConfirmArrival}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                      Confirm Driver Arrival
+                    </button>
+                    <button
+                      onClick={handleRejectArrival}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <X className="w-5 h-5" />
+                      Rider Not Here
+                    </button>
+                  </div>
+                )}
+
+                {waitingForRiderStart && (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+                    Your rider is waiting at pickup. Once they signal the trip start, you can approve it here.
+                  </div>
                 )}
 
                 {activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && activeRide.riderConfirmedStart && (
-                  <button 
-                    onClick={handleConfirmStart}
-                    className="w-full bg-white text-black py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Navigation2 className="w-5 h-5" />
-                    Approve Trip Start
-                  </button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button 
+                      onClick={handleConfirmStart}
+                      className="w-full bg-white text-black py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Navigation2 className="w-5 h-5" />
+                      Approve Trip Start
+                    </button>
+                    <button
+                      onClick={handleRejectStart}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <X className="w-5 h-5" />
+                      Reject Start
+                    </button>
+                  </div>
+                )}
+
+                {waitingForRiderEndSignal && (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+                    The ride is in progress. This panel will unlock the final confirmation once the rider marks that you have reached the destination.
+                  </div>
                 )}
 
                 {activeRide.status === 'ongoing' && activeRide.riderConfirmedEnd && (
-                  <button 
-                    onClick={handleConfirmReached}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-                  >
-                    <Award className="w-5 h-5" />
-                    Confirm We've Arrived
-                  </button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button 
+                      onClick={handleConfirmReached}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Award className="w-5 h-5" />
+                      Confirm We've Arrived
+                    </button>
+                    <button
+                      onClick={handleRejectReached}
+                      className="w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <X className="w-5 h-5" />
+                      Not There Yet
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -870,13 +993,54 @@ export default function PassengerDashboard({ user, profile }: Props) {
               {onlineRiders.length} {t('online')}
             </span>
           </div>
+          {(passengerLocation || onlineRiders.some((rider) => hasValidCoordinates(rider.currentLocation))) && (
+            <div className="bg-white p-3 rounded-[2rem] border border-gray-100 shadow-sm space-y-3">
+              <MapComponent
+                markers={[
+                  ...(passengerLocation ? [{
+                    id: 'passenger-preview',
+                    position: passengerLocation,
+                    label: 'You',
+                    type: 'passenger' as const
+                  }] : []),
+                  ...onlineRiders
+                    .filter((rider) => hasValidCoordinates(rider.currentLocation))
+                    .map((rider) => ({
+                      id: rider.uid,
+                      position: rider.currentLocation!,
+                      label: rider.name,
+                      type: selectedNearbyRiderId === rider.uid ? 'rider' as const : 'nearby' as const,
+                      profile: rider
+                    }))
+                ]}
+                center={
+                  onlineRiders.find((rider) => rider.uid === selectedNearbyRiderId && hasValidCoordinates(rider.currentLocation))?.currentLocation ||
+                  passengerLocation ||
+                  onlineRiders.find((rider) => hasValidCoordinates(rider.currentLocation))?.currentLocation
+                }
+                zoom={14}
+                height="260px"
+                onMarkerClick={(marker) => {
+                  if (marker.type === 'nearby' || marker.type === 'rider') {
+                    setSelectedNearbyRiderId(marker.id);
+                  }
+                }}
+              />
+              {selectedNearbyRiderId && (
+                <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                  Viewing {onlineRiders.find((rider) => rider.uid === selectedNearbyRiderId)?.name || 'selected rider'} on the map.
+                </div>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4">
             {onlineRiders.map((rider) => (
               <motion.div 
                 key={rider.uid}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="bg-white p-5 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between group hover:border-black transition-all"
+                onClick={() => setSelectedNearbyRiderId(rider.uid)}
+                className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex items-center justify-between group transition-all cursor-pointer ${selectedNearbyRiderId === rider.uid ? 'border-black ring-2 ring-black/10' : 'border-gray-100 hover:border-black'}`}
               >
                 <div className="flex items-center gap-4">
                   <div className="relative">
@@ -906,7 +1070,10 @@ export default function PassengerDashboard({ user, profile }: Props) {
                 
                 <div className="flex items-center gap-2">
                   <button 
-                    onClick={() => handleToggleFavorite(rider.uid)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFavorite(rider.uid);
+                    }}
                     className={`p-3 rounded-2xl transition-all active:scale-95 ${profile.favoriteUserIds?.includes(rider.uid) ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-gray-50 text-gray-400 hover:text-red-500'}`}
                   >
                     <Heart className={`w-5 h-5 ${profile.favoriteUserIds?.includes(rider.uid) ? 'fill-current' : ''}`} />
@@ -914,6 +1081,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                   {rider.phoneNumber && (
                     <a 
                       href={`tel:${rider.phoneNumber}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="bg-black text-white p-3 rounded-2xl shadow-lg shadow-black/10 hover:bg-gray-800 transition-all active:scale-95 group-hover:scale-105"
                       title={t('callRider')}
                     >
@@ -1032,10 +1200,18 @@ export default function PassengerDashboard({ user, profile }: Props) {
         {savedLocations.length > 0 ? (
           <div className="grid gap-2">
             {savedLocations.map((loc) => (
-              <button 
+              <div
                 key={loc.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => { setDestination(loc.address); }}
-                className="w-full text-left bg-white p-5 rounded-3xl border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group shadow-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setDestination(loc.address);
+                  }
+                }}
+                className="w-full text-left bg-white p-5 rounded-3xl border border-transparent hover:border-gray-200 transition-all flex items-center justify-between group shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-black/10"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
@@ -1051,11 +1227,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     e.stopPropagation();
                     handleRemoveSavedLocation(loc.id);
                   }}
+                  type="button"
                   className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </button>
+              </div>
             ))}
           </div>
         ) : (

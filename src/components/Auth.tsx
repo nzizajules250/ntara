@@ -45,8 +45,19 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       const email = formatPhoneToEmail(formData.phone);
       
       if (mode === 'register') {
-        const result = await createUserWithEmailAndPassword(auth, email, formData.password);
-        const user = result.user;
+        let user;
+
+        try {
+          const result = await createUserWithEmailAndPassword(auth, email, formData.password);
+          user = result.user;
+        } catch (err: any) {
+          if (err?.code === 'auth/email-already-in-use') {
+            const result = await signInWithEmailAndPassword(auth, email, formData.password);
+            user = result.user;
+          } else {
+            throw err;
+          }
+        }
 
         const newProfile: UserProfile = {
           uid: user.uid,
@@ -66,8 +77,13 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           permitCardNumber: role === 'rider' ? formData.permitCardNumber : undefined,
         };
 
-        await createUserProfile(newProfile);
-        onAuthSuccess(newProfile);
+        const existingProfile = await getUserProfile(user.uid);
+        if (!existingProfile) {
+          await createUserProfile(newProfile);
+          onAuthSuccess(newProfile);
+        } else {
+          onAuthSuccess(existingProfile);
+        }
       } else {
         const result = await signInWithEmailAndPassword(auth, email, formData.password);
         const profile = await getUserProfile(result.user.uid);

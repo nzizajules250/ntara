@@ -6,11 +6,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
 import { arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import MapComponent from './MapComponent';
 
 interface Props {
   user: FirebaseUser;
   profile: UserProfile;
 }
+
+const hasValidCoordinates = (point?: { lat: number; lng: number } | null) =>
+  !!point &&
+  Number.isFinite(point.lat) &&
+  Number.isFinite(point.lng) &&
+  (point.lat !== 0 || point.lng !== 0);
 
 export default function RiderDashboard({ user, profile }: Props) {
   const { t } = useLanguage();
@@ -171,11 +178,13 @@ export default function RiderDashboard({ user, profile }: Props) {
           updatedAt: serverTimestamp()
         });
       } else if (activeRide.status === 'arrived') {
+        if (!activeRide.passengerConfirmedArrival || activeRide.riderConfirmedStart) return;
         await updateDoc(doc(db, 'rides', activeRide.id), {
           riderConfirmedStart: true,
           updatedAt: serverTimestamp()
         });
       } else if (activeRide.status === 'ongoing') {
+        if (activeRide.riderConfirmedEnd) return;
         await updateDoc(doc(db, 'rides', activeRide.id), {
           riderConfirmedEnd: true,
           updatedAt: serverTimestamp()
@@ -187,6 +196,62 @@ export default function RiderDashboard({ user, profile }: Props) {
   };
 
   if (activeRide) {
+    const rideMapMarkers = [
+      ...(hasValidCoordinates(profile.currentLocation) ? [{
+        id: 'rider-live',
+        position: profile.currentLocation!,
+        label: profile.name,
+        type: 'rider' as const,
+        profile
+      }] : []),
+      ...(hasValidCoordinates(activeRide.pickup) ? [{
+        id: 'pickup',
+        position: { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng },
+        label: activeRide.pickup.address,
+        type: 'passenger' as const
+      }] : []),
+      ...(hasValidCoordinates(activeRide.destination) ? [{
+        id: 'destination',
+        position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng },
+        label: activeRide.destination.address,
+        type: 'nearby' as const
+      }] : [])
+    ];
+
+    const rideMapCenter =
+      profile.currentLocation ||
+      (activeRide.status === 'ongoing' && hasValidCoordinates(activeRide.destination)
+        ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng }
+        : hasValidCoordinates(activeRide.pickup)
+          ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng }
+          : undefined);
+
+    const riderActionDisabled =
+      (activeRide.status === 'arrived' && (!activeRide.passengerConfirmedArrival || !!activeRide.riderConfirmedStart)) ||
+      (activeRide.status === 'ongoing' && !!activeRide.riderConfirmedEnd);
+
+    const riderActionLabel =
+      activeRide.status === 'accepted'
+        ? t('arrivedButton')
+        : activeRide.status === 'arrived'
+          ? activeRide.passengerConfirmedArrival
+            ? (activeRide.riderConfirmedStart ? t('waitingForPassenger') : t('startTripButton'))
+            : 'Waiting for passenger confirmation'
+          : (activeRide.riderConfirmedEnd ? t('waitingForPassenger') : t('completeRideButton'));
+
+    const riderActionHint =
+      activeRide.status === 'accepted'
+        ? 'Mark arrival once you reach the pickup point.'
+        : activeRide.status === 'arrived'
+          ? activeRide.passengerConfirmedArrival
+            ? (activeRide.riderConfirmedStart
+              ? 'Start request sent. Waiting for the passenger to approve the trip start.'
+              : 'Passenger confirmed your arrival. Start the trip when you are both ready.')
+            : 'The passenger needs to confirm your arrival before you can start the trip.'
+          : activeRide.riderConfirmedEnd
+            ? 'Arrival notice sent. Waiting for the passenger to confirm the trip has ended.'
+            : 'Signal the passenger once you reach the destination.';
+
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold tracking-tight">{t('activeDuty')}</h2>
@@ -194,9 +259,27 @@ export default function RiderDashboard({ user, profile }: Props) {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-black text-white p-8 rounded-3xl shadow-2xl relative overflow-hidden"
+          className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
         >
-          <div className="relative z-10 space-y-8">
+          {rideMapMarkers.length > 0 ? (
+            <div className="p-3 sm:p-4">
+              <MapComponent
+                markers={rideMapMarkers}
+                center={rideMapCenter}
+                zoom={15}
+                showNearbyDrivers={false}
+                height="240px"
+              />
+            </div>
+          ) : (
+            <div className="px-8 pt-8">
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+                The map will appear once pickup or rider location data is available.
+              </div>
+            </div>
+          )}
+
+          <div className="relative z-10 p-8 pt-4 space-y-8">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-4">
                 {passengerProfile && (
@@ -251,17 +334,16 @@ export default function RiderDashboard({ user, profile }: Props) {
 
             <button 
               onClick={handleNextStep}
-              disabled={
-                (activeRide.status === 'arrived' && activeRide.riderConfirmedStart) ||
-                (activeRide.status === 'ongoing' && activeRide.riderConfirmedEnd)
-              }
+              disabled={riderActionDisabled}
               className="w-full bg-white text-black py-5 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {activeRide.status === 'accepted' ? t('arrivedButton') : 
-               activeRide.status === 'arrived' ? (activeRide.riderConfirmedStart ? t('waitingForPassenger') : t('startTripButton')) : 
-               (activeRide.riderConfirmedEnd ? t('waitingForPassenger') : t('completeRideButton'))}
+              {riderActionLabel}
               <ArrowRight className="w-6 h-6" />
             </button>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+              {riderActionHint}
+            </div>
 
             {activeRide.status === 'accepted' && (
               <div className="flex justify-center">

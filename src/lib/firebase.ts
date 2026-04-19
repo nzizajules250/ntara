@@ -46,6 +46,22 @@ export function handleFirestoreError(error: any, operationType: FirestoreErrorIn
   throw error;
 }
 
+function stripUndefinedFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefinedFields(item)) as T;
+  }
+
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, item]) => item !== undefined)
+        .map(([key, item]) => [key, stripUndefinedFields(item)])
+    ) as T;
+  }
+
+  return value;
+}
+
 export type UserRole = 'passenger' | 'rider';
 
 export interface SavedLocation {
@@ -127,6 +143,7 @@ export interface Ride {
   passengerConfirmedArrival?: boolean;
   passengerConfirmedStart?: boolean;
   passengerConfirmedEnd?: boolean;
+  riderConfirmedStart?: boolean;
   riderConfirmedEnd?: boolean;
   isOnTime?: boolean;
 }
@@ -144,7 +161,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 
 export async function createUserProfile(profile: UserProfile): Promise<void> {
   try {
-    await setDoc(doc(db, 'users', profile.uid), profile);
+    await setDoc(doc(db, 'users', profile.uid), stripUndefinedFields(profile));
   } catch (error) {
     return handleFirestoreError(error, 'create', `users/${profile.uid}`);
   }

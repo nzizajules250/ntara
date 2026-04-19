@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { auth, getUserProfile, UserProfile, subscribeToUserProfile } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Moon, Sun, Car, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X } from 'lucide-react';
+import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PassengerDashboard from './components/PassengerDashboard';
 import RiderDashboard from './components/RiderDashboard';
@@ -163,12 +163,16 @@ function AppContent() {
 
         <nav className="bg-white dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center cursor-pointer" onClick={() => setView('dashboard')}>
-                <Car className="w-5 h-5 text-white dark:text-black" />
-              </div>
-              <span className="font-bold text-lg sm:text-xl tracking-tight dark:text-white hidden sm:inline">SwiftRide</span>
-            </div>
+            <button
+              onClick={() => setView('dashboard')}
+              className="flex items-center transition-transform hover:scale-[1.02] active:scale-[0.99]"
+            >
+              <img
+                src="/ntwara-logo.png"
+                alt="Ntwara"
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
+            </button>
 
             <div className="flex items-center gap-1 sm:gap-4">
               <button 
@@ -203,7 +207,7 @@ function AppContent() {
           </div>
         </nav>
 
-        <main className="max-w-3xl mx-auto p-3 sm:p-6">
+        <main className="max-w-3xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pb-8">
           <AnimatePresence mode="wait">
             {view === 'dashboard' ? (
               <motion.div
@@ -268,7 +272,7 @@ function AppContent() {
         </div>
 
         {/* Desktop Bottom Navigation */}
-        <div className="hidden lg:flex fixed bottom-6 left-1/2 -translate-x-1/2 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-2xl shadow-black/20 backdrop-blur-xl z-50">
+        <div className="hidden lg:flex fixed right-6 bottom-6 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-2xl shadow-black/20 backdrop-blur-xl z-50 max-w-[calc(100vw-3rem)]">
           <button 
             onClick={() => setView('dashboard')}
             className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'dashboard' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}

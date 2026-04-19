@@ -1,5 +1,5 @@
 import { GoogleMap, LoadScript, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { UserProfile } from '../lib/firebase';
 
 interface MapMarker {
@@ -32,6 +32,7 @@ export default function MapComponent({
   height = '400px'
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
+  const googleMaps = (window as any).google?.maps;
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -99,19 +100,19 @@ export default function MapComponent({
             key={marker.id}
             position={marker.position}
             title={marker.label}
-            icon={{
+            icon={googleMaps ? {
               url: getMarkerColor(marker.type),
-              scaledSize: new (window as any).google.maps.Size(32, 32)
-            }}
+              scaledSize: new googleMaps.Size(32, 32)
+            } : getMarkerColor(marker.type)}
             onClick={() => handleMarkerClick(marker)}
           >
             {selectedMarker?.id === marker.id && marker.profile && (
               <InfoWindowF
                 position={marker.position}
                 onCloseClick={() => setSelectedMarker(null)}
-                options={{
-                  pixelOffset: new (window as any).google.maps.Size(0, -32)
-                }}
+                options={googleMaps ? {
+                  pixelOffset: new googleMaps.Size(0, -32)
+                } : undefined}
               >
                 <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
                   <p className="font-bold text-gray-900">{marker.profile.name}</p>
