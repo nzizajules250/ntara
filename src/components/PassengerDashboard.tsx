@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
 import { updateDoc, doc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import MapComponent from './MapComponent';
 
 interface Props {
   user: FirebaseUser;
@@ -47,7 +48,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
   // Map Pins
   const [isPickingOnMap, setIsPickingOnMap] = useState<'pickup' | 'destination' | null>(null);
   const [passengerLocation, setPassengerLocation] = useState<{lat: number, lng: number} | null>(null);
-  const [showTraffic, setShowTraffic] = useState(true);
   
   // Saved Locations
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(profile.savedLocations || []);
@@ -281,12 +281,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
     try {
       await createRideRequest({
         passengerId: user.uid,
-        pickup: { address: pickup, lat: 0, lng: 0 },
+        pickup: { address: pickup, lat: passengerLocation?.lat || 0, lng: passengerLocation?.lng || 0 },
         destination: { address: destination, lat: 0, lng: 0 },
         status: 'requested',
         fare: estimatedFare,
-        promoCode: appliedPromo?.code || null,
-        discountAmount: appliedPromo ? (estimatedFare / (1 - (appliedPromo.discountType === 'percentage' ? appliedPromo.value / 100 : 0)) - estimatedFare) : 0
+        ...(appliedPromo && { promoCode: appliedPromo.code }),
+        ...(appliedPromo && { discountAmount: (estimatedFare / (1 - (appliedPromo.discountType === 'percentage' ? appliedPromo.value / 100 : 0)) - estimatedFare) })
       });
       setPickup('');
       setDestination('');
@@ -455,102 +455,37 @@ export default function PassengerDashboard({ user, profile }: Props) {
           animate={{ opacity: 1, scale: 1 }}
           className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
         >
-          <div className="h-48 bg-gray-900 relative overflow-hidden">
-            <div className="absolute inset-0 opacity-20 pointer-events-none">
-              <div className="absolute inset-0 border border-white/10" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
-            </div>
-            
-            {/* Online Riders (only if status is requested) */}
-            {activeRide.status === 'requested' && onlineRiders.map((rider) => (
-              <motion.div 
-                key={rider.uid}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ 
-                  opacity: 1, 
-                  scale: 1,
-                  x: rider.currentLocation ? (rider.currentLocation.lng + 0.1278) * 1000 * 5 : 0, 
-                  y: rider.currentLocation ? (rider.currentLocation.lat - 51.5074) * 1000 * 5 : 0 
-                }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-              >
-                <div className="w-4 h-4 bg-emerald-500/40 rounded-full flex items-center justify-center border border-emerald-400">
-                  <Navigation2 className="w-2 h-2 text-emerald-400 fill-current" />
-                </div>
-              </motion.div>
-            ))}
-
-            {/* Real-time traffic mock line */}
-            {showTraffic && (
-              <>
-                <div className="absolute top-1/2 left-0 w-full h-1 bg-red-500/30 blur-sm shadow-[0_0_10px_rgba(239,68,68,0.5)] overflow-hidden">
-                  <motion.div 
-                    animate={{ x: ['100%', '-100%'] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
-                    className="w-full h-full bg-red-400 opacity-50" 
-                  />
-                </div>
-                <div className="absolute top-[48%] left-[20%] w-[30%] h-1 bg-orange-400/50 overflow-hidden">
-                  <motion.div 
-                    animate={{ x: ['100%', '-100%'] }}
-                    transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-                    className="w-full h-full bg-orange-300 opacity-50" 
-                  />
-                </div>
-                <div className="absolute top-1/2 right-0 w-[40%] h-1 bg-emerald-500/40 overflow-hidden" />
-              </>
-            )}
-
-            {riderProfile?.currentLocation && (
-              <motion.div 
-                animate={{ 
-                  x: (riderProfile.currentLocation.lng + 0.1278) * 1000 * 5, 
-                  y: (riderProfile.currentLocation.lat - 51.5074) * 1000 * 5 
-                }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
-              >
-                <div className="relative group">
-                  <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/50 border-2 border-white">
-                    <Navigation2 className="w-4 h-4 text-white fill-current" />
-                  </div>
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {t('rider')}: {riderProfile.name}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {passengerLocation && (
-              <motion.div 
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30"
-                style={{ marginLeft: 20, marginTop: 20 }} // Slightly offset passenger from center for demo
-              >
-                <div className="relative group">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/50 border-2 border-white">
-                    <UserIcon className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black text-white text-[8px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    You
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            <div className="absolute bottom-4 left-4 z-40">
-              <button 
-                onClick={() => setShowTraffic(!showTraffic)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[8px] font-bold uppercase tracking-wider backdrop-blur-md border transition-all ${showTraffic ? 'bg-red-500/20 text-red-200 border-red-500/30' : 'bg-white/10 text-white/60 border-white/20'}`}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${showTraffic ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`} />
-                {showTraffic ? 'Traffic On' : 'Traffic Off'}
-              </button>
-            </div>
-
-            <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-              <div className="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl text-[8px] font-bold uppercase tracking-wider text-white/60">
-                Live Tracking
-              </div>
-            </div>
-          </div>
+          {passengerLocation && (
+            <MapComponent 
+              markers={[
+                {
+                  id: 'passenger',
+                  position: passengerLocation,
+                  label: 'You',
+                  type: 'passenger'
+                },
+                ...(riderProfile?.currentLocation ? [{
+                  id: riderProfile.uid,
+                  position: riderProfile.currentLocation,
+                  label: riderProfile.name,
+                  type: 'rider' as const,
+                  profile: riderProfile
+                }] : []),
+                ...(activeRide.status === 'requested' ? nearbyDrivers
+                  .filter(d => d.currentLocation)
+                  .map(driver => ({
+                    id: driver.uid,
+                    position: driver.currentLocation!,
+                    label: driver.name,
+                    type: 'nearby' as const,
+                    profile: driver
+                  })) : [])
+              ]}
+              center={riderProfile?.currentLocation || passengerLocation}
+              zoom={15}
+              height="384px"
+            />
+          )}
 
           <div className="p-8 relative z-10 flex flex-col h-full justify-between gap-8">
             <div className="flex justify-between items-start">
@@ -690,8 +625,17 @@ export default function PassengerDashboard({ user, profile }: Props) {
                               {driver.rating}
                             </div>
                           </div>
+                          {driver.badges && driver.badges.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              {driver.badges.map((badge, idx) => (
+                                <span key={idx} className="text-[8px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                                  {badge}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {driver.phoneNumber && (
-                            <p className="text-[10px] text-white/40 font-medium">{driver.phoneNumber}</p>
+                            <p className="text-[10px] text-white/40 font-medium mt-1">{driver.phoneNumber}</p>
                           )}
                         </div>
                       </div>

@@ -27,6 +27,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     licenseClass: '',
     vehicleModel: '',
     numberPlate: '',
+    permitCardNumber: '',
     avatarUrl: ''
   });
 
@@ -56,12 +57,13 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           rating: 4.8,
           totalTrips: 0,
           avatarUrl: formData.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.name}`,
-          gender: role === 'rider' ? formData.gender : undefined,
+          gender: formData.gender,
           dob: role === 'rider' ? formData.dob : undefined,
           vehicleType: role === 'rider' ? formData.vehicleType : undefined,
           licenseClass: role === 'rider' ? formData.licenseClass : undefined,
           vehicleModel: role === 'rider' ? formData.vehicleModel : undefined,
           numberPlate: role === 'rider' ? formData.numberPlate : undefined,
+          permitCardNumber: role === 'rider' ? formData.permitCardNumber : undefined,
         };
 
         await createUserProfile(newProfile);
@@ -220,6 +222,22 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             />
           </div>
 
+          {mode === 'register' && role === 'passenger' && (
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <select 
+                className="w-full bg-gray-50 py-4 pl-12 pr-4 rounded-2xl border-none focus:ring-2 focus:ring-black outline-none font-medium appearance-none"
+                value={formData.gender}
+                onChange={e => setFormData({...formData, gender: e.target.value})}
+                required
+              >
+                <option value="">{t('gender')}</option>
+                <option value="Male">{t('male')}</option>
+                <option value="Female">{t('female')}</option>
+              </select>
+            </div>
+          )}
+
           <AnimatePresence>
             {mode === 'register' && role === 'rider' && (
               <motion.div 
@@ -301,6 +319,18 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                     className="w-full bg-gray-50 py-4 pl-12 pr-4 rounded-2xl border-none focus:ring-2 focus:ring-black outline-none font-medium text-sm uppercase"
                     value={formData.numberPlate}
                     onChange={e => setFormData({...formData, numberPlate: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="relative">
+                  <ClipboardCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+                  <input 
+                    type="text"
+                    placeholder={t('permitCardNumber') || 'Permit Card Number'}
+                    className="w-full bg-gray-50 py-4 pl-12 pr-4 rounded-2xl border-none focus:ring-2 focus:ring-black outline-none font-medium text-sm"
+                    value={formData.permitCardNumber}
+                    onChange={e => setFormData({...formData, permitCardNumber: e.target.value})}
                     required
                   />
                 </div>

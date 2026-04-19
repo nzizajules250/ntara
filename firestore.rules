@@ -78,8 +78,12 @@ service cloud.firestore {
           && data.status in ['requested', 'accepted', 'arrived', 'ongoing', 'completed', 'cancelled']
           && data.fare is number && data.fare >= 0
           && data.pickup.address is string && data.pickup.address.size() <= 200
+          && data.pickup.lat is number && data.pickup.lng is number
           && data.destination.address is string && data.destination.address.size() <= 200
+          && data.destination.lat is number && data.destination.lng is number
           && (data.get('riderId', null) == null || data.riderId is string)
+          && (data.get('promoCode', null) == null || data.promoCode is string)
+          && (data.get('discountAmount', null) == null || data.discountAmount is number)
           && (data.get('acceptedAt', null) == null || data.acceptedAt == request.time)
           && (data.get('arrivedAt', null) == null || data.arrivedAt == request.time)
           && (data.get('startedAt', null) == null || data.startedAt == request.time)
@@ -90,7 +94,9 @@ service cloud.firestore {
           && (data.get('riderConfirmedStart', null) == null || data.riderConfirmedStart is bool)
           && (data.get('riderConfirmedEnd', null) == null || data.riderConfirmedEnd is bool)
           && (data.get('isOnTime', null) == null || data.isOnTime is bool)
-          && data.createdAt == request.time;
+          && (data.get('cancellationReason', null) == null || data.cancellationReason is string)
+          && (data.get('riderRating', null) == null || (data.riderRating is number && data.riderRating >= 1 && data.riderRating <= 5))
+          && (data.get('ratingReason', null) == null || data.ratingReason in ['driving', 'timing', 'navigation']);
       }
 
       // Read permissions

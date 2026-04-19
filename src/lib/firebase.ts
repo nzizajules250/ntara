@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 export { doc, updateDoc };
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -76,6 +76,7 @@ export interface UserProfile {
   licenseClass?: string;
   vehicleModel?: string;
   numberPlate?: string;
+  permitCardNumber?: string;
   availabilityRadius?: number;
   favoriteUserIds?: string[];
   savedLocations?: SavedLocation[];
@@ -322,11 +323,12 @@ export async function saveLocation(uid: string, location: Omit<SavedLocation, 'i
     const newLocation: SavedLocation = {
       id: `${Date.now()}`,
       ...location,
-      createdAt: serverTimestamp()
+      createdAt: new Date().toISOString()
     };
     
     await updateDoc(user, {
-      savedLocations: arrayUnion(newLocation)
+      savedLocations: arrayUnion(newLocation),
+      updatedAt: serverTimestamp()
     });
   } catch (error) {
     return handleFirestoreError(error, 'update', `users/${uid}/savedLocations`);

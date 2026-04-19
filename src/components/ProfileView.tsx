@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, auth, db } from '../lib/firebase';
 import { User, Mail, Phone, Calendar, Car, ShieldCheck, Award, LogOut, ChevronRight, Smartphone, Star, MapPin, Edit2, Zap, Heart, Siren, Save, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { updateDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { useLanguage } from '../lib/i18n';
 
 interface Props {
@@ -21,6 +21,36 @@ export default function ProfileView({ profile }: Props) {
   const [newAvatar, setNewAvatar] = useState(profile.avatarUrl || '');
   
   const [isSaving, setIsSaving] = useState(false);
+  const [favoriteDrivers, setFavoriteDrivers] = useState<UserProfile[]>([]);
+
+  // Update local state when profile prop changes
+  useEffect(() => {
+    setNewName(profile.name || '');
+    setNewPhone(profile.phoneNumber || '');
+    setNewAvatar(profile.avatarUrl || '');
+    setEmergencyName(profile.emergencyContact?.name || '');
+    setEmergencyPhone(profile.emergencyContact?.phone || '');
+  }, [profile]);
+
+  // Load favorite drivers if passenger
+  useEffect(() => {
+    const loadFavorites = async () => {
+      if (profile.role === 'passenger' && profile.favoriteUserIds?.length) {
+        try {
+          const drivers = await Promise.all(
+            profile.favoriteUserIds.map(uid => getDoc(doc(db, 'users', uid)))
+          );
+          const favoriteData = drivers
+            .filter(d => d.exists())
+            .map(d => ({ id: d.id, ...d.data() } as UserProfile));
+          setFavoriteDrivers(favoriteData);
+        } catch (error) {
+          console.error('Error loading favorite drivers:', error);
+        }
+      }
+    };
+    loadFavorites();
+  }, [profile]);
 
   const stats = [
     { label: t('rating'), value: profile.rating.toString(), icon: Star, color: 'text-amber-500' },
@@ -247,6 +277,55 @@ export default function ProfileView({ profile }: Props) {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Favorite Drivers Section (for passengers only) */}
+        {profile.role === 'passenger' && favoriteDrivers.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 px-6">{t('favoriteDrivers') || 'Favorite Drivers'}</h3>
+            <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-zinc-800 shadow-sm">
+              <div className="divide-y divide-gray-50 dark:divide-zinc-800">
+                {favoriteDrivers.map((driver) => (
+                  <div key={driver.uid} className="p-5 flex items-center justify-between group hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <div className="flex items-center gap-4 flex-1">
+                      {driver.avatarUrl ? (
+                        <img src={driver.avatarUrl} className="w-12 h-12 rounded-2xl object-cover border-2 border-gray-100 dark:border-zinc-800" alt="" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-200 dark:bg-zinc-800 rounded-2xl flex items-center justify-center">
+                          <User className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 dark:text-white">{driver.name}</p>
+                        <div className="flex items-center gap-2">
+                          <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                          <span className="text-xs font-bold text-gray-600 dark:text-zinc-400">{driver.riderRating?.toFixed(1) || 'N/A'}</span>
+                          {driver.badges && driver.badges.length > 0 && (
+                            <div className="flex gap-1">
+                              {driver.badges.slice(0, 2).map((badge, i) => (
+                                <span key={i} className="inline-block px-2 py-0.5 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[9px] font-black rounded-lg">
+                                  {badge.charAt(0)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a 
+                        href={`tel:${driver.phoneNumber}`}
+                        className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all"
+                      >
+                        <Phone className="w-5 h-5" />
+                      </a>
+                      <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {profile.role === 'rider' && (
           <div className="space-y-4">
