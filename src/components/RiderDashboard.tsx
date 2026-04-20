@@ -219,6 +219,12 @@ export default function RiderDashboard({ user, profile }: Props) {
           riderConfirmedEnd: true,
           updatedAt: serverTimestamp()
         });
+        // Send notification to passenger
+        addNotification(
+          'Ride Ending',
+          'You have confirmed the destination. Waiting for passenger confirmation...',
+          'info'
+        );
       }
     } catch (error) {
       console.error("Failed to update status", error);

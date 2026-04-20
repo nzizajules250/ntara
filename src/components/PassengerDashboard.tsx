@@ -29,8 +29,28 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
   const [onlineRiders, setOnlineRiders] = useState<UserProfile[]>([]);
   const [nearbyDrivers, setNearbyDrivers] = useState<UserProfile[]>([]);
-  const lastStatusRef = useRef<string | null>(null);
-  const [isRequesting, setIsRequesting] = useState(false);
+  // Map to track which rides have already had notifications sent for specific events
+  const notificationSentRef = useRef<{
+    [rideId: string]: Set<string>
+  }>({});
+
+  const hasNotificationBeenSent = (rideId: string, eventType: string): boolean => {
+    if (!notificationSentRef.current[rideId]) {
+      notificationSentRef.current[rideId] = new Set();
+    }
+    return notificationSentRef.current[rideId].has(eventType);
+  };
+
+  const markNotificationAsSent = (rideId: string, eventType: string): void => {
+    if (!notificationSentRef.current[rideId]) {
+      notificationSentRef.current[rideId] = new Set();
+    }
+    notificationSentRef.current[rideId].add(eventType);
+  };
+
+  const clearNotificationTracking = (rideId: string): void => {
+    delete notificationSentRef.current[rideId];
+  };
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -231,6 +251,48 @@ export default function PassengerDashboard({ user, profile }: Props) {
           addNotification(t('tripStartedNotify'), t('tripStartedMessage'), 'info');
         }
         lastStatusRef.current = active.status;
+      }
+
+      // Real-time notification when driver confirms end of ride
+      if (active && active.status === 'ongoing' && active.riderConfirmedEnd && !lastStatusRef.current?.includes('driver-confirmed-end')) {
+        addNotification(
+          'Destination Reached! 📍',
+          'Your driver has confirmed you\'ve reached the destination.',
+          'ride_accepted',
+          [
+            {
+              label: 'Confirm Arrival',
+              onClick: async () => {
+                try {
+                  await updateDoc(doc(db, 'rides', active.id), {
+                    passengerConfirmedEnd: true,
+                    status: 'completed',
+                    completedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                  });
+                } catch (err) {
+                  console.error('Error confirming end:', err);
+                }
+              },
+              style: 'primary'
+            },
+            {
+              label: 'Not Yet',
+              onClick: async () => {
+                try {
+                  await updateDoc(doc(db, 'rides', active.id), {
+                    riderConfirmedEnd: false,
+                    updatedAt: serverTimestamp()
+                  });
+                } catch (err) {
+                  console.error('Error rejecting end:', err);
+                }
+              },
+              style: 'secondary'
+            }
+          ]
+        );
+        lastStatusRef.current = 'driver-confirmed-end';
       }
 
       if (justCompleted && lastStatusRef.current !== 'completed') {

@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithP
 import { Car, Smartphone, Shield, ArrowRight, Loader2, Mail, Lock, User, Phone, Calendar, ClipboardCheck, Camera, Info, Languages, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
+import { enableBackgroundTracking } from '../lib/pushNotifications';
 
 interface AuthProps {
   onAuthSuccess: (profile: UserProfile) => void;
@@ -80,14 +81,20 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         const existingProfile = await getUserProfile(user.uid);
         if (!existingProfile) {
           await createUserProfile(newProfile);
+          // Enable background tracking after successful registration
+          await enableBackgroundTracking();
           onAuthSuccess(newProfile);
         } else {
+          // Enable background tracking after successful login
+          await enableBackgroundTracking();
           onAuthSuccess(existingProfile);
         }
       } else {
         const result = await signInWithEmailAndPassword(auth, email, formData.password);
         const profile = await getUserProfile(result.user.uid);
         if (profile) {
+          // Enable background tracking after successful login
+          await enableBackgroundTracking();
           onAuthSuccess(profile);
         } else {
           setError(t('profileNotFound'));
@@ -128,8 +135,12 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           avatarUrl: user.photoURL || undefined
         };
         await createUserProfile(newProfile);
+        // Enable background tracking after successful Google registration
+        await enableBackgroundTracking();
         onAuthSuccess(newProfile);
       } else {
+        // Enable background tracking after successful Google login
+        await enableBackgroundTracking();
         onAuthSuccess(existingProfile);
       }
     } catch (err: any) {

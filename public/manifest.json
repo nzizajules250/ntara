@@ -1,11 +1,13 @@
 {
   "name": "SwiftRide",
   "short_name": "SwiftRide",
-  "description": "Real-time ride-sharing platform.",
+  "description": "Real-time ride-sharing platform with background tracking.",
   "start_url": "/",
   "display": "fullscreen",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "prefer_related_applications": false,
+  "categories": ["transportation", "productivity"],
   "icons": [
     {
       "src": "https://i.ibb.co/qYN9hjsH/Chat-GPT-Image-Apr-19-2026-03-11-30-PM.png",
@@ -21,5 +23,60 @@
     }
   ],
   "orientation": "portrait",
-  "scope": "/"
+  "scope": "/",
+  "background_sync": {
+    "periodic_sync_min_interval": 300000,
+    "events": [
+      {
+        "tag": "ride-tracking",
+        "periodInMS": 300000
+      },
+      {
+        "tag": "notification-sync",
+        "periodInMS": 60000
+      },
+      {
+        "tag": "location-tracking",
+        "periodInMS": 180000
+      }
+    ]
+  },
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Request a Ride",
+      "short_name": "Ride",
+      "description": "Quickly request a ride",
+      "url": "/?page=request",
+      "icons": [
+        {
+          "src": "https://i.ibb.co/qYN9hjsH/Chat-GPT-Image-Apr-19-2026-03-11-30-PM.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "View Ride History",
+      "short_name": "History",
+      "description": "Check your ride history",
+      "url": "/?page=history",
+      "icons": [
+        {
+          "src": "https://i.ibb.co/qYN9hjsH/Chat-GPT-Image-Apr-19-2026-03-11-30-PM.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
 }
