@@ -1,4 +1,4 @@
-import { GoogleMap, MarkerF, InfoWindowF, CircleF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindowF, CircleF, useJsApiLoader, PolylineF } from '@react-google-maps/api';
 import { useState } from 'react';
 import { UserProfile } from '../lib/firebase';
 import { Satellite, Map as MapIcon } from 'lucide-react';
@@ -11,17 +11,25 @@ interface MapMarker {
   profile?: UserProfile;
 }
 
+interface MapRoute {
+  id: string;
+  points: { lat: number; lng: number }[];
+  color?: string;
+  label?: string;
+}
+
 interface MapComponentProps {
   center?: { lat: number; lng: number };
   zoom?: number;
   markers: MapMarker[];
+  routes?: MapRoute[];
   showNearbyDrivers?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
   height?: string;
   showMapTypeControl?: boolean;
 }
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
+const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
 
 const defaultCenter = { lat: 51.5074, lng: -0.1278 }; // London
 
@@ -29,6 +37,7 @@ export default function MapComponent({
   center = defaultCenter,
   zoom = 14,
   markers = [],
+  routes = [],
   showNearbyDrivers = true,
   onMarkerClick,
   height = '400px',
@@ -163,6 +172,21 @@ export default function MapComponent({
           }}
         />
       )}
+
+      {/* Routes/Polylines */}
+      {routes.map((route) => (
+        <PolylineF
+          key={route.id}
+          path={route.points}
+          options={{
+            strokeColor: route.color || '#3b82f6',
+            strokeOpacity: 0.7,
+            strokeWeight: 3,
+            geodesic: true,
+            clickable: false
+          }}
+        />
+      ))}
 
       {/* Markers */}
       {markers.map((marker) => (

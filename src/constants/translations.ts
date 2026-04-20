@@ -129,7 +129,7 @@ export const translations = {
     car: 'Car',
     motorcycle: 'Motorcycle',
     riderCredentials: 'Rider Credentials',
-    empoweringJourney: 'Empowering your daily journey',
+    empoweringJourney: 'Gwino Tugende',
   },
   fr: {
     welcome: 'Bienvenue sur SwiftRide',
@@ -259,7 +259,7 @@ export const translations = {
     car: 'Voiture',
     motorcycle: 'Moto',
     riderCredentials: 'Identifiants du chauffeur',
-    empoweringJourney: 'Améliorez votre voyage quotidien',
+    empoweringJourney: 'Gwino tugende',
   },
   rw: {
     welcome: 'Ikaze kuri SwiftRide',
@@ -389,6 +389,6 @@ export const translations = {
     car: 'Imodoka',
     motorcycle: 'Moto',
     riderCredentials: 'Ibiranga umushoferi',
-    empoweringJourney: 'Tworoheje ingendo zawe zamburiye',
+    empoweringJourney: 'Gwino Tugende',
   }
 };

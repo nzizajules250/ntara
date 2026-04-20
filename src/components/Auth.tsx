@@ -163,7 +163,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             alt="SwiftRide"
             className="h-16 sm:h-24 w-auto object-contain mx-auto mb-3"
           />
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">SwiftRide</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">Ntwara</h1>
           <p className="text-xs sm:text-sm text-gray-500 font-medium">{t('empoweringJourney')}</p>
         </div>
 

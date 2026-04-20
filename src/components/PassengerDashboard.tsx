@@ -29,6 +29,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
   const [onlineRiders, setOnlineRiders] = useState<UserProfile[]>([]);
   const [nearbyDrivers, setNearbyDrivers] = useState<UserProfile[]>([]);
+  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
   // Map to track which rides have already had notifications sent for specific events
   const notificationSentRef = useRef<{
     [rideId: string]: Set<string>
@@ -139,6 +140,56 @@ export default function PassengerDashboard({ user, profile }: Props) {
       );
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // Fetch and display route from driver to destination
+  const fetchRoute = async (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
+    try {
+      const apiKey = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${start.lat},${start.lng}&destination=${end.lat},${end.lng}&key=${apiKey}`
+      );
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        const points: { lat: number; lng: number }[] = [];
+        const encodedPolyline = data.routes[0].overview_polyline.points;
+        
+        // Decode polyline
+        let index = 0, lat = 0, lng = 0;
+        for (let i = 0; i < encodedPolyline.length; i++) {
+          let result = 0;
+          let shift = 0;
+          let byte;
+          do {
+            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+          } while (byte >= 0x20);
+          lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+          
+          result = 0;
+          shift = 0;
+          i++;
+          do {
+            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+          } while (byte >= 0x20);
+          lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+          
+          points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+        }
+        
+        setRoutes([{
+          id: 'active-route',
+          points: points,
+          color: '#3b82f6'
+        }]);
+      }
+    } catch (err) {
+      console.error('Error fetching route:', err);
     }
   };
 
@@ -363,6 +414,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setRiderProfile(null);
     }
   }, [activeRide?.riderId]);
+
+  // Fetch and update route when driver or destination location changes
+  useEffect(() => {
+    if (riderProfile?.currentLocation && hasValidCoordinates(activeRide?.destination) && activeRide?.status !== 'requested') {
+      fetchRoute(riderProfile.currentLocation, {
+        lat: activeRide.destination.lat,
+        lng: activeRide.destination.lng
+      });
+    }
+  }, [riderProfile?.currentLocation?.lat, riderProfile?.currentLocation?.lng, activeRide?.destination?.lat, activeRide?.destination?.lng, activeRide?.status]);
 
   const handleApplyPromo = async () => {
     if (!promoInput) return;
@@ -623,10 +684,10 @@ export default function PassengerDashboard({ user, profile }: Props) {
                   type: 'rider' as const,
                   profile: riderProfile
                 }] : []),
-                ...(hasValidCoordinates(activeRide.destination) && activeRide.status === 'ongoing' ? [{
+                ...(hasValidCoordinates(activeRide.destination) ? [{
                   id: 'destination',
                   position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng },
-                  label: activeRide.destination.address,
+                  label: activeRide.destination.address || 'Destination',
                   type: 'destination' as const
                 }] : []),
                 ...(activeRide.status === 'requested' ? nearbyDrivers
@@ -639,6 +700,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     profile: driver
                   })) : [])
               ]}
+              routes={routes}
               center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
               zoom={15}
               height="384px"
@@ -768,8 +830,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
               </div>
             </div>
 
-            {/* Nearby Drivers Section - Show when ride is requested and status is active */}
-            {activeRide.status === 'requested' && nearbyDrivers.length > 0 && (
+            {/* Nearby Drivers Section - Removed, destination now shown on map */}
+            {false && (
               <div className="pt-6 border-t border-white/10">
                 <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-4">Nearby Drivers ({nearbyDrivers.length})</p>
                 <div className="space-y-3 max-h-48 overflow-y-auto">

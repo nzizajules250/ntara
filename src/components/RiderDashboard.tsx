@@ -25,6 +25,7 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [availableRides, setAvailableRides] = useState<Ride[]>([]);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [passengerProfile, setPassengerProfile] = useState<UserProfile | null>(null);
+  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
   // Track which rides have had their end confirmation notification sent
@@ -178,6 +179,20 @@ export default function RiderDashboard({ user, profile }: Props) {
     }
   }, [activeRide?.passengerId]);
 
+  // Calculate route from driver current location to destination
+  useEffect(() => {
+    if (
+      activeRide &&
+      ['accepted', 'arrived', 'ongoing'].includes(activeRide.status) &&
+      profile.currentLocation &&
+      activeRide.destination &&
+      hasValidCoordinates(profile.currentLocation) &&
+      hasValidCoordinates(activeRide.destination)
+    ) {
+      fetchRoute(profile.currentLocation, activeRide.destination);
+    }
+  }, [profile.currentLocation, activeRide?.destination, activeRide?.status]);
+
   const handleToggleFavorite = async (targetUserId: string) => {
     const isFavorite = profile.favoriteUserIds?.includes(targetUserId);
     try {
@@ -204,6 +219,56 @@ export default function RiderDashboard({ user, profile }: Props) {
       });
     } catch (error) {
       console.error("Failed to accept", error);
+    }
+  };
+
+  // Fetch and display route from driver to destination
+  const fetchRoute = async (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
+    try {
+      const apiKey = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/directions/json?origin=${start.lat},${start.lng}&destination=${end.lat},${end.lng}&key=${apiKey}`
+      );
+      const data = await response.json();
+      
+      if (data.routes && data.routes.length > 0) {
+        const points: { lat: number; lng: number }[] = [];
+        const encodedPolyline = data.routes[0].overview_polyline.points;
+        
+        // Decode polyline
+        let index = 0, lat = 0, lng = 0;
+        for (let i = 0; i < encodedPolyline.length; i++) {
+          let result = 0;
+          let shift = 0;
+          let byte;
+          do {
+            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+          } while (byte >= 0x20);
+          lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+          
+          result = 0;
+          shift = 0;
+          i++;
+          do {
+            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+          } while (byte >= 0x20);
+          lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+          
+          points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+        }
+        
+        setRoutes([{
+          id: 'active-route',
+          points: points,
+          color: '#10b981'
+        }]);
+      }
+    } catch (err) {
+      console.error('Error fetching route:', err);
     }
   };
 
@@ -320,6 +385,7 @@ export default function RiderDashboard({ user, profile }: Props) {
                 zoom={15}
                 showNearbyDrivers={false}
                 height="240px"
+                routes={routes}
               />
             </div>
           ) : (
