@@ -1,20 +1,21 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img width="1200" height="475" alt="GHBanner" src="https://i.ibb.co/qYN9hjsH/Chat-GPT-Image-Apr-19-2026-03-11-30-PM.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# Ntwara Website
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/56bccb88-c195-4a2d-aeb3-81a4e8c2eecf
-
-## Run Locally
+Iyi ni website igiye gufasha abantu gutega moto cyangwa imodoka vuba batavuye aho bari .
 
 **Prerequisites:**  Node.js
 
+# Ibisabwa
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Iyandikishe nkumumotari
+   ** Perime , Plake yikinyabiziga  numero ya telephone
+
+2. Umugenzi asabwa kwiyandikisha ariko birikunozwa neza aho umugenzi atazajya yiyandikisha
+   ## Murakoze Gusura Repostory Yange
+ Muyisure kuri :<a href="https://ntwara.vercel.app">Ntwara</a>
+
+*Developed by * : ## Jules_Dev
+ 
