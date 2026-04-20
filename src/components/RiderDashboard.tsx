@@ -61,6 +61,11 @@ export default function RiderDashboard({ user, profile }: Props) {
     const subAvailable = subscribeToAvailableRides((rides) => {
       let filtered = rides.filter(r => r.passengerId !== user.uid);
       
+      // Filter by vehicle type if rider has one
+      if (profile.vehicleType) {
+        filtered = filtered.filter(ride => !ride.vehicleType || ride.vehicleType === profile.vehicleType);
+      }
+      
       // Filter by radius if set and rider has a location
       if (profile.availabilityRadius && profile.currentLocation) {
         filtered = filtered.filter(ride => {
@@ -559,6 +564,37 @@ export default function RiderDashboard({ user, profile }: Props) {
           </p>
         </div>
       </motion.div>
+
+      {/* Driver Map View - Show when waiting for rides */}
+      {!activeRide && profile.currentLocation && hasValidCoordinates(profile.currentLocation) && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
+        >
+          <div className="p-3 sm:p-4">
+            <MapComponent
+              markers={[
+                {
+                  id: 'driver-live',
+                  position: profile.currentLocation,
+                  label: profile.name,
+                  type: 'rider' as const,
+                  profile
+                }
+              ]}
+              center={profile.currentLocation}
+              zoom={14}
+              showNearbyDrivers={false}
+              height="250px"
+            />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 text-sm text-white/80">
+            <p className="font-semibold">Waiting for ride requests...</p>
+            <p className="text-xs text-white/50">Your location is visible to nearby passengers</p>
+          </div>
+        </motion.div>
+      )}
 
       <div>
         <h2 className="text-4xl font-bold tracking-tight mb-2">{t('availableJobs')}</h2>

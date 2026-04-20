@@ -146,6 +146,7 @@ export interface Ride {
   riderConfirmedStart?: boolean;
   riderConfirmedEnd?: boolean;
   isOnTime?: boolean;
+  vehicleType?: 'car' | 'motorcycle';
 }
 
 // User Profile Actions

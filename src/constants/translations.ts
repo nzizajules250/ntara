@@ -262,6 +262,8 @@ export const translations = {
     motorcycle: 'Moto',
     riderCredentials: 'Identifiants du chauffeur',
     empoweringJourney: 'Gwino tugende',
+    phoneRequired: 'Numéro de téléphone requis',
+    continueButton: 'Continuer',
   },
   rw: {
     welcome: 'Ikaze kuri SwiftRide',
@@ -392,5 +394,7 @@ export const translations = {
     motorcycle: 'Moto',
     riderCredentials: 'Ibiranga umushoferi',
     empoweringJourney: 'Gwino Tugende',
+    phoneRequired: 'Nomero ya terefoni ikintu gikenewe',
+    continueButton: 'Komeza',
   }
 };

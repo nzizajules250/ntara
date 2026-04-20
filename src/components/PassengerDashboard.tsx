@@ -1,7 +1,7 @@
 import { useState, useEffect, MouseEvent, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
-import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus } from 'lucide-react';
+import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike  } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -24,6 +24,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const { addNotification } = useNotifications();
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
+  const [vehicleType, setVehicleType] = useState<'car' | 'motorcycle'>('car');
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [completedRide, setCompletedRide] = useState<Ride | null>(null);
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
@@ -417,13 +418,13 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
   // Fetch and update route when driver or destination location changes
   useEffect(() => {
-    if (riderProfile?.currentLocation && hasValidCoordinates(activeRide?.destination) && activeRide?.status !== 'requested') {
+    if (riderProfile?.currentLocation && hasValidCoordinates(activeRide?.destination)) {
       fetchRoute(riderProfile.currentLocation, {
         lat: activeRide.destination.lat,
         lng: activeRide.destination.lng
       });
     }
-  }, [riderProfile?.currentLocation?.lat, riderProfile?.currentLocation?.lng, activeRide?.destination?.lat, activeRide?.destination?.lng, activeRide?.status]);
+  }, [riderProfile?.currentLocation?.lat, riderProfile?.currentLocation?.lng, activeRide?.destination?.lat, activeRide?.destination?.lng]);
 
   const handleApplyPromo = async () => {
     if (!promoInput) return;
@@ -454,6 +455,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
         destination: { address: destination, lat: 0, lng: 0 },
         status: 'requested',
         fare: estimatedFare,
+        vehicleType: vehicleType,
         ...(appliedPromo && { promoCode: appliedPromo.code }),
         ...(appliedPromo && { discountAmount: (estimatedFare / (1 - (appliedPromo.discountType === 'percentage' ? appliedPromo.value / 100 : 0)) - estimatedFare) })
       });
@@ -1055,6 +1057,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
               placeholder={t('pickupLocation')}
               value={pickup}
               onChange={(e) => setPickup(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && pickup.trim()) {
+                  // When user presses Enter, show map for picking
+                  setIsPickingOnMap('pickup');
+                }
+              }}
               className="w-full bg-gray-50 py-5 pl-12 pr-24 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
             />
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -1093,6 +1101,35 @@ export default function PassengerDashboard({ user, profile }: Props) {
           </div>
         </div>
 
+        {/* Vehicle Type Selection - With Location Inputs */}
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Choose Vehicle</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setVehicleType('car')}
+              className={`p-4 rounded-2xl border-2 transition-all font-bold flex flex-col items-center gap-2 ${
+                vehicleType === 'car'
+                  ? 'border-black bg-black text-white'
+                  : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <Car className="w-6 h-6" />
+              <span className="text-sm">Car</span>
+            </button>
+            <button
+              onClick={() => setVehicleType('motorcycle')}
+              className={`p-4 rounded-2xl border-2 transition-all font-bold flex flex-col items-center gap-2 ${
+                vehicleType === 'motorcycle'
+                  ? 'border-black bg-black text-white'
+                  : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <Bike className="w-6 h-6" />
+              <span className="text-sm">Motorcycle</span>
+            </button>
+          </div>
+        </div>
+
         {isPickingOnMap && (
           <motion.div 
             initial={{ opacity: 0, height: 0 }}
@@ -1103,7 +1140,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
             <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
               <div className="space-y-4 mb-8">
                 <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
-                <p className="font-bold uppercase tracking-widest text-[10px]">Click anywhere to set {isPickingOnMap}</p>
+                <div>
+                  <p className="font-bold uppercase tracking-widest text-[10px] text-white">Click on the map to set your {isPickingOnMap}</p>
+                  {isPickingOnMap === 'pickup' && pickup && (
+                    <p className="text-xs text-emerald-400 font-semibold mt-2">{pickup}</p>
+                  )}
+                </div>
               </div>
               
               <div className="flex gap-4">
