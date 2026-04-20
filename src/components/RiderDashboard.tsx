@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus, updateDriverStatus } from '../lib/firebase';
-import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -334,12 +334,21 @@ export default function RiderDashboard({ user, profile }: Props) {
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-4">
                 {passengerProfile && (
-                  <button 
-                    onClick={() => handleToggleFavorite(passengerProfile.uid)}
-                    className={`p-3 rounded-2xl transition-all active:scale-95 border ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-white/5 border-white/10 text-white/40'}`}
-                  >
-                    <Heart className={`w-6 h-6 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleToggleFavorite(passengerProfile.uid)}
+                      className={`p-3 rounded-2xl transition-all active:scale-95 border ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-white/5 border-white/10 text-white/40'}`}
+                    >
+                      <Heart className={`w-6 h-6 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
+                    </button>
+                    <a 
+                      href={`tel:${passengerProfile.phoneNumber}`}
+                      className="p-3 rounded-2xl transition-all active:scale-95 border bg-emerald-500/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30"
+                      title={`Call ${passengerProfile.name}`}
+                    >
+                      <Phone className="w-6 h-6" />
+                    </a>
+                  </div>
                 )}
                 <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold uppercase tracking-wider mb-4">

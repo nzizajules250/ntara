@@ -702,6 +702,13 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     >
                       <Heart className={`w-5 h-5 ${profile.favoriteUserIds?.includes(riderProfile.uid) ? 'fill-current' : ''}`} />
                     </button>
+                    <a
+                      href={`tel:${riderProfile.phoneNumber}`}
+                      className="p-2 rounded-xl transition-all active:scale-95 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                      title={`Call ${riderProfile.name}`}
+                    >
+                      <Phone className="w-5 h-5" />
+                    </a>
                     <div className="relative">
                       {riderProfile.avatarUrl ? (
                         <img src={riderProfile.avatarUrl} referrerPolicy="no-referrer" className="w-14 h-14 rounded-2xl border-2 border-white/20" />
