@@ -1,4 +1,4 @@
-import { GoogleMap, LoadScript, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindowF, CircleF, useJsApiLoader } from '@react-google-maps/api';
 import { useState } from 'react';
 import { UserProfile } from '../lib/firebase';
 
@@ -32,7 +32,10 @@ export default function MapComponent({
   height = '400px'
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
-  const googleMaps = (window as any).google?.maps;
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'ntwara-google-maps-script',
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY
+  });
 
   const getMarkerColor = (type: string) => {
     switch (type) {
@@ -52,87 +55,101 @@ export default function MapComponent({
     onMarkerClick?.(marker);
   };
 
-  return (
-    <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY}>
-      <GoogleMap
-        mapContainerStyle={{
-          width: '100%',
-          height: height,
-          borderRadius: '1.5rem'
-        }}
-        center={center}
-        zoom={zoom}
-        options={{
-          disableDefaultUI: false,
-          zoomControl: true,
-          mapTypeControl: false,
-          fullscreenControl: true,
-          streetViewControl: false,
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
-            }
-          ]
-        }}
+  if (loadError) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-[1.5rem] bg-gray-100 text-sm text-gray-500"
+        style={{ height }}
       >
-        {/* Show nearby drivers radius circle */}
-        {showNearbyDrivers && (
-          <CircleF
-            center={center}
-            radius={10000}
-            options={{
-              fillColor: '#10b981',
-              fillOpacity: 0.1,
-              strokeColor: '#10b981',
-              strokeOpacity: 0.3,
-              strokeWeight: 1,
-              editable: false,
-              draggable: false
-            }}
-          />
-        )}
+        Unable to load Google Maps right now.
+      </div>
+    );
+  }
 
-        {/* Markers */}
-        {markers.map((marker) => (
-          <MarkerF
-            key={marker.id}
-            position={marker.position}
-            title={marker.label}
-            icon={googleMaps ? {
-              url: getMarkerColor(marker.type),
-              scaledSize: new googleMaps.Size(32, 32)
-            } : getMarkerColor(marker.type)}
-            onClick={() => handleMarkerClick(marker)}
-          >
-            {selectedMarker?.id === marker.id && marker.profile && (
-              <InfoWindowF
-                position={marker.position}
-                onCloseClick={() => setSelectedMarker(null)}
-                options={googleMaps ? {
-                  pixelOffset: new googleMaps.Size(0, -32)
-                } : undefined}
-              >
-                <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
-                  <p className="font-bold text-gray-900">{marker.profile.name}</p>
-                  {marker.profile.rating && (
-                    <p className="text-sm text-amber-600">⭐ {marker.profile.rating}</p>
-                  )}
-                  {marker.profile.phoneNumber && (
-                    <a
-                      href={`tel:${marker.profile.phoneNumber}`}
-                      className="text-blue-600 text-sm hover:underline"
-                    >
-                      📞 Call
-                    </a>
-                  )}
-                </div>
-              </InfoWindowF>
-            )}
-          </MarkerF>
-        ))}
-      </GoogleMap>
-    </LoadScript>
+  if (!isLoaded) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-[1.5rem] bg-gray-100 text-sm text-gray-500"
+        style={{ height }}
+      >
+        Loading map...
+      </div>
+    );
+  }
+
+  return (
+    <GoogleMap
+      mapContainerStyle={{
+        width: '100%',
+        height,
+        borderRadius: '1.5rem'
+      }}
+      center={center}
+      zoom={zoom}
+      options={{
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: false,
+        styles: [
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }]
+          }
+        ]
+      }}
+    >
+      {/* Show nearby drivers radius circle */}
+      {showNearbyDrivers && (
+        <CircleF
+          center={center}
+          radius={10000}
+          options={{
+            fillColor: '#10b981',
+            fillOpacity: 0.1,
+            strokeColor: '#10b981',
+            strokeOpacity: 0.3,
+            strokeWeight: 1,
+            editable: false,
+            draggable: false
+          }}
+        />
+      )}
+
+      {/* Markers */}
+      {markers.map((marker) => (
+        <MarkerF
+          key={marker.id}
+          position={marker.position}
+          title={marker.label}
+          icon={getMarkerColor(marker.type)}
+          onClick={() => handleMarkerClick(marker)}
+        >
+          {selectedMarker?.id === marker.id && marker.profile && (
+            <InfoWindowF
+              position={marker.position}
+              onCloseClick={() => setSelectedMarker(null)}
+            >
+              <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
+                <p className="font-bold text-gray-900">{marker.profile.name}</p>
+                {marker.profile.rating && (
+                  <p className="text-sm text-amber-600">⭐ {marker.profile.rating}</p>
+                )}
+                {marker.profile.phoneNumber && (
+                  <a
+                    href={`tel:${marker.profile.phoneNumber}`}
+                    className="text-blue-600 text-sm hover:underline"
+                  >
+                    📞 Call
+                  </a>
+                )}
+              </div>
+            </InfoWindowF>
+          )}
+        </MarkerF>
+      ))}
+    </GoogleMap>
   );
 }
