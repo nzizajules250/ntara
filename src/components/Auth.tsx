@@ -16,6 +16,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
   const [role, setRole] = useState<UserRole>('passenger');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPhoneOverlay, setShowPhoneOverlay] = useState(false);
+  const [googlePhoneNumber, setGooglePhoneNumber] = useState('');
+  const [pendingGoogleUser, setPendingGoogleUser] = useState<any>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -117,27 +120,9 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       
       const existingProfile = await getUserProfile(user.uid);
       if (!existingProfile) {
-        if (selectedRole === 'rider') {
-          // If they chose rider but use google, we might need a step 2 for rider details
-          // For now, we'll just set defaults or they can update later.
-          // But the user specifically asked for these fields during registration.
-          // I'll show a message or just force manual for riders if they want fields.
-          // Let's allow google for passengers, but maybe limit it for riders?
-          // Actually, let's just make a simple default for google.
-        }
-        const newProfile: UserProfile = {
-          uid: user.uid,
-          email: user.email || '',
-          name: user.displayName || 'User',
-          role: selectedRole,
-          rating: 4.8,
-          totalTrips: 0,
-          avatarUrl: user.photoURL || undefined
-        };
-        await createUserProfile(newProfile);
-        // Enable background tracking after successful Google registration
-        await enableBackgroundTracking();
-        onAuthSuccess(newProfile);
+        // Store pending user and show phone overlay
+        setPendingGoogleUser({ user, selectedRole });
+        setShowPhoneOverlay(true);
       } else {
         // Enable background tracking after successful Google login
         await enableBackgroundTracking();
@@ -150,7 +135,104 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     }
   };
 
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googlePhoneNumber.trim() || !pendingGoogleUser) return;
+
+    setLoading(true);
+    try {
+      const user = pendingGoogleUser.user;
+      const newProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email || '',
+        name: user.displayName || 'User',
+        role: pendingGoogleUser.selectedRole,
+        phoneNumber: googlePhoneNumber,
+        rating: 4.8,
+        totalTrips: 0,
+        avatarUrl: user.photoURL || undefined
+      };
+      await createUserProfile(newProfile);
+      // Enable background tracking after successful Google registration
+      await enableBackgroundTracking();
+      onAuthSuccess(newProfile);
+      setShowPhoneOverlay(false);
+      setGooglePhoneNumber('');
+      setPendingGoogleUser(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
+    <>
+      {/* Phone Number Overlay for Google Sign-In */}
+      <AnimatePresence>
+        {showPhoneOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-gray-100"
+            >
+              <div className="text-center mb-6">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{t('phoneRequired')}</h2>
+                <p className="text-sm text-gray-600">We need your phone number to complete your profile and enable ride notifications.</p>
+              </div>
+
+              <form onSubmit={handlePhoneSubmit} className="space-y-4">
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input 
+                    type="tel"
+                    required
+                    autoFocus
+                    placeholder={t('phoneNumber')}
+                    className="w-full bg-gray-50 py-3 sm:py-4 pl-12 pr-4 rounded-2xl border-none focus:ring-2 focus:ring-black outline-none font-medium text-sm"
+                    value={googlePhoneNumber}
+                    onChange={e => setGooglePhoneNumber(e.target.value)}
+                  />
+                </div>
+
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="p-3 bg-red-50 text-red-600 rounded-2xl text-xs font-bold flex items-center gap-2"
+                  >
+                    <Info className="w-4 h-4" />
+                    {error}
+                  </motion.div>
+                )}
+
+                <button 
+                  type="submit"
+                  disabled={loading || !googlePhoneNumber.trim()}
+                  className="w-full bg-black text-white py-3 sm:py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all shadow-xl shadow-black/10 disabled:opacity-50 text-sm sm:text-base"
+                >
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      {t('continueButton')}
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     <div className="min-h-screen sm:min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden sm:overflow-auto fixed sm:static inset-0 sm:inset-auto">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -417,5 +499,6 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
         </p>
       </motion.div>
     </div>
+    </>
   );
 }

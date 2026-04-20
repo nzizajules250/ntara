@@ -130,6 +130,8 @@ export const translations = {
     motorcycle: 'Motorcycle',
     riderCredentials: 'Rider Credentials',
     empoweringJourney: 'Gwino Tugende',
+    phoneRequired: 'Phone Number Required',
+    continueButton: 'Continue',
   },
   fr: {
     welcome: 'Bienvenue sur SwiftRide',
