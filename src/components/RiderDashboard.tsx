@@ -27,6 +27,8 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [passengerProfile, setPassengerProfile] = useState<UserProfile | null>(null);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
+  // Track which rides have had their end confirmation notification sent
+  const endConfirmationSentRef = useRef<Set<string>>(new Set());
 
   // Badge logic
   const possibleBadges = [
@@ -79,6 +81,7 @@ export default function RiderDashboard({ user, profile }: Props) {
     // Subscribe to rides accepted by me
     const subMyRides = subscribeToUserRides(user.uid, 'rider', (rides) => {
       const active = rides.find(r => ['accepted', 'arrived', 'ongoing'].includes(r.status));
+      
       if (active && active.status !== lastStatusRef.current) {
         if (active.status === 'arrived') {
           addNotification(
@@ -117,6 +120,13 @@ export default function RiderDashboard({ user, profile }: Props) {
         }
         lastStatusRef.current = active.status;
       }
+      
+      // Clean up tracking when ride is no longer active
+      const completedRides = rides.filter(r => r.status === 'completed');
+      completedRides.forEach(ride => {
+        endConfirmationSentRef.current.delete(ride.id);
+      });
+      
       setActiveRide(active || null);
     });
 
@@ -215,16 +225,21 @@ export default function RiderDashboard({ user, profile }: Props) {
         });
       } else if (activeRide.status === 'ongoing') {
         if (activeRide.riderConfirmedEnd) return;
+        
         await updateDoc(doc(db, 'rides', activeRide.id), {
           riderConfirmedEnd: true,
           updatedAt: serverTimestamp()
         });
-        // Send notification to passenger
-        addNotification(
-          'Ride Ending',
-          'You have confirmed the destination. Waiting for passenger confirmation...',
-          'info'
-        );
+        
+        // Send notification to driver only once per ride
+        if (!endConfirmationSentRef.current.has(activeRide.id)) {
+          addNotification(
+            'Ride Ending',
+            'You have confirmed the destination. Waiting for passenger confirmation...',
+            'info'
+          );
+          endConfirmationSentRef.current.add(activeRide.id);
+        }
       }
     } catch (error) {
       console.error("Failed to update status", error);

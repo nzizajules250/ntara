@@ -51,6 +51,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const clearNotificationTracking = (rideId: string): void => {
     delete notificationSentRef.current[rideId];
   };
+  const [isRequesting, setIsRequesting] = useState(false);
   const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -242,62 +243,75 @@ export default function PassengerDashboard({ user, profile }: Props) {
       const active = rides.find(r => ['requested', 'accepted', 'arrived', 'ongoing'].includes(r.status));
       const justCompleted = rides.find(r => r.status === 'completed' && !r.riderRating);
       
-      if (active && active.status !== lastStatusRef.current) {
-        if (active.status === 'accepted') {
-          addNotification(t('rideAccepted'), t('riderOnWay'), 'ride_accepted');
-        } else if (active.status === 'arrived') {
-          addNotification(t('riderArrivedNotify'), t('riderArrivedMessage'), 'ride_accepted');
-        } else if (active.status === 'ongoing') {
-          addNotification(t('tripStartedNotify'), t('tripStartedMessage'), 'info');
+      if (active) {
+        // Status change notifications
+        if (!hasNotificationBeenSent(active.id, `status-${active.status}`)) {
+          if (active.status === 'accepted') {
+            addNotification(t('rideAccepted'), t('riderOnWay'), 'ride_accepted');
+            markNotificationAsSent(active.id, `status-${active.status}`);
+          } else if (active.status === 'arrived') {
+            addNotification(t('riderArrivedNotify'), t('riderArrivedMessage'), 'ride_accepted');
+            markNotificationAsSent(active.id, `status-${active.status}`);
+          } else if (active.status === 'ongoing') {
+            addNotification(t('tripStartedNotify'), t('tripStartedMessage'), 'info');
+            markNotificationAsSent(active.id, `status-${active.status}`);
+          }
         }
-        lastStatusRef.current = active.status;
+
+        // Driver confirmed end of ride - send only once per ride
+        if (active.status === 'ongoing' && active.riderConfirmedEnd && !hasNotificationBeenSent(active.id, 'driver-confirmed-end')) {
+          addNotification(
+            'Destination Reached! 📍',
+            'Your driver has confirmed you\'ve reached the destination.',
+            'ride_accepted',
+            [
+              {
+                label: 'Confirm Arrival',
+                onClick: async () => {
+                  try {
+                    await updateDoc(doc(db, 'rides', active.id), {
+                      passengerConfirmedEnd: true,
+                      status: 'completed',
+                      completedAt: serverTimestamp(),
+                      updatedAt: serverTimestamp()
+                    });
+                  } catch (err) {
+                    console.error('Error confirming end:', err);
+                  }
+                },
+                style: 'primary'
+              },
+              {
+                label: 'Not Yet',
+                onClick: async () => {
+                  try {
+                    await updateDoc(doc(db, 'rides', active.id), {
+                      riderConfirmedEnd: false,
+                      updatedAt: serverTimestamp()
+                    });
+                  } catch (err) {
+                    console.error('Error rejecting end:', err);
+                  }
+                },
+                style: 'secondary'
+              }
+            ]
+          );
+          markNotificationAsSent(active.id, 'driver-confirmed-end');
+        }
       }
 
-      // Real-time notification when driver confirms end of ride
-      if (active && active.status === 'ongoing' && active.riderConfirmedEnd && !lastStatusRef.current?.includes('driver-confirmed-end')) {
-        addNotification(
-          'Destination Reached! 📍',
-          'Your driver has confirmed you\'ve reached the destination.',
-          'ride_accepted',
-          [
-            {
-              label: 'Confirm Arrival',
-              onClick: async () => {
-                try {
-                  await updateDoc(doc(db, 'rides', active.id), {
-                    passengerConfirmedEnd: true,
-                    status: 'completed',
-                    completedAt: serverTimestamp(),
-                    updatedAt: serverTimestamp()
-                  });
-                } catch (err) {
-                  console.error('Error confirming end:', err);
-                }
-              },
-              style: 'primary'
-            },
-            {
-              label: 'Not Yet',
-              onClick: async () => {
-                try {
-                  await updateDoc(doc(db, 'rides', active.id), {
-                    riderConfirmedEnd: false,
-                    updatedAt: serverTimestamp()
-                  });
-                } catch (err) {
-                  console.error('Error rejecting end:', err);
-                }
-              },
-              style: 'secondary'
-            }
-          ]
-        );
-        lastStatusRef.current = 'driver-confirmed-end';
-      }
-
-      if (justCompleted && lastStatusRef.current !== 'completed') {
+      if (justCompleted && !hasNotificationBeenSent(justCompleted.id, 'trip-completed')) {
         addNotification(t('tripCompletedNotify'), t('tripCompletedMessage'), 'success');
-        lastStatusRef.current = 'completed';
+        markNotificationAsSent(justCompleted.id, 'trip-completed');
+      }
+
+      // Clear tracking when ride transitions away from active states
+      const previousActive = notificationSentRef.current;
+      for (const rideId in previousActive) {
+        if (!rides.find(r => r.id === rideId && ['requested', 'accepted', 'arrived', 'ongoing', 'completed'].includes(r.status))) {
+          clearNotificationTracking(rideId);
+        }
       }
 
       setActiveRide(active || null);
