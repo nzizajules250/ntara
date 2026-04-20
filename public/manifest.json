@@ -1,9 +1,9 @@
 {
-  "name": "Ntwara",
-  "short_name": "Ntwara",
+  "name": "SwiftRide",
+  "short_name": "SwiftRide",
   "description": "Real-time ride-sharing platform.",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [

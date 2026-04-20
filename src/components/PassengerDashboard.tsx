@@ -547,6 +547,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
                   type: 'rider' as const,
                   profile: riderProfile
                 }] : []),
+                ...(hasValidCoordinates(activeRide.destination) && activeRide.status === 'ongoing' ? [{
+                  id: 'destination',
+                  position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng },
+                  label: activeRide.destination.address,
+                  type: 'destination' as const
+                }] : []),
                 ...(activeRide.status === 'requested' ? nearbyDrivers
                   .filter(d => d.currentLocation)
                   .map(driver => ({
@@ -887,106 +893,108 @@ export default function PassengerDashboard({ user, profile }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-4xl font-bold tracking-tight mb-2 text-gray-900">{t('whereTo')}</h2>
-        <p className="text-gray-500 font-medium">{t('requestRide')}</p>
-      </div>
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+      {/* Main Content */}
+      <div className="flex-1 space-y-8">
+        <div>
+          <h2 className="text-4xl font-bold tracking-tight mb-2 text-gray-900">{t('whereTo')}</h2>
+          <p className="text-gray-500 font-medium">{t('requestRide')}</p>
+        </div>
 
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-4">
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-black z-10" />
-          <div className="absolute left-[1.125rem] top-[60%] w-0.5 h-full bg-gray-100" />
-          <input 
-            type="text"
-            placeholder={t('pickupLocation')}
-            value={pickup}
-            onChange={(e) => setPickup(e.target.value)}
-            className="w-full bg-gray-50 py-5 pl-12 pr-24 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-4">
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-black z-10" />
+            <div className="absolute left-[1.125rem] top-[60%] w-0.5 h-full bg-gray-100" />
+            <input 
+              type="text"
+              placeholder={t('pickupLocation')}
+              value={pickup}
+              onChange={(e) => setPickup(e.target.value)}
+              className="w-full bg-gray-50 py-5 pl-12 pr-24 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <button 
+                onClick={handleUseCurrentLocation}
+                disabled={isLocating}
+                className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+                title="Use current location"
+              >
+                {isLocating ? <Loader2 className="w-5 h-5 animate-spin text-black" /> : <Navigation2 className="w-5 h-5" />}
+              </button>
+              <button 
+                onClick={() => setIsPickingOnMap('pickup')}
+                className={`p-2 rounded-lg transition-colors ${isPickingOnMap === 'pickup' ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-100'}`}
+                title="Pick on map"
+              >
+                <MapIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 z-10" />
+            <input 
+              type="text"
+              placeholder={t('destinationAddress')}
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className="w-full bg-gray-50 py-5 pl-12 pr-12 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
+            />
             <button 
-              onClick={handleUseCurrentLocation}
-              disabled={isLocating}
-              className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              title="Use current location"
-            >
-              {isLocating ? <Loader2 className="w-5 h-5 animate-spin text-black" /> : <Navigation2 className="w-5 h-5" />}
-            </button>
-            <button 
-              onClick={() => setIsPickingOnMap('pickup')}
-              className={`p-2 rounded-lg transition-colors ${isPickingOnMap === 'pickup' ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-100'}`}
-              title="Pick on map"
+              onClick={() => setIsPickingOnMap('destination')}
+              className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${isPickingOnMap === 'destination' ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-100'}`}
             >
               <MapIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
-        <div className="relative">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 z-10" />
-          <input 
-            type="text"
-            placeholder={t('destinationAddress')}
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            className="w-full bg-gray-50 py-5 pl-12 pr-12 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
-          />
-          <button 
-            onClick={() => setIsPickingOnMap('destination')}
-            className={`absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${isPickingOnMap === 'destination' ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-100'}`}
-          >
-            <MapIcon className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
 
-      {isPickingOnMap && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="bg-gray-900 rounded-[2rem] overflow-hidden relative cursor-crosshair border-4 border-black"
-          onClick={handleMapClick}
-        >
-          <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
-            <div className="space-y-4 mb-8">
-              <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
-              <p className="font-bold uppercase tracking-widest text-[10px]">Click anywhere to set {isPickingOnMap}</p>
-            </div>
-            
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-200 border border-red-500/30 text-[8px] font-bold uppercase tracking-wider">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                Live Traffic
+        {isPickingOnMap && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="bg-gray-900 rounded-[2rem] overflow-hidden relative cursor-crosshair border-4 border-black"
+            onClick={handleMapClick}
+          >
+            <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
+              <div className="space-y-4 mb-8">
+                <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
+                <p className="font-bold uppercase tracking-widest text-[10px]">Click anywhere to set {isPickingOnMap}</p>
               </div>
-              {passengerLocation && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[8px] font-bold uppercase tracking-wider">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  Your Location
+              
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-200 border border-red-500/30 text-[8px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Live Traffic
                 </div>
-              )}
+                {passengerLocation && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[8px] font-bold uppercase tracking-wider">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    Your Location
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
-          
-          {passengerLocation && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2" style={{ marginLeft: -40 }}>
-              <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/50" />
-              <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest">You</span>
-            </div>
-          )}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
+            
+            {passengerLocation && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2" style={{ marginLeft: -40 }}>
+                <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/50" />
+                <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest">You</span>
+              </div>
+            )}
 
-          <button 
-            onClick={(e) => { e.stopPropagation(); setIsPickingOnMap(null); }}
-            className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </motion.div>
-      )}
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsPickingOnMap(null); }}
+              className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
 
-      {/* Available Riders Nearby */}
-      {!activeRide && onlineRiders.length > 0 && (
-        <div className="space-y-4">
+        {/* Available Riders Nearby */}
+        {!activeRide && onlineRiders.length > 0 && (
+          <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="text-sm font-black uppercase tracking-widest text-gray-400">{t('nearbyRiders')}</h3>
             <span className="bg-emerald-500/10 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
@@ -1296,6 +1304,109 @@ export default function PassengerDashboard({ user, profile }: Props) {
           </div>
         )}
       </AnimatePresence>
+      </div>
+
+      {/* Side Panel - Current Location */}
+      <div className="hidden lg:flex flex-col gap-6 lg:w-80">
+        {passengerLocation && (
+          <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-gray-100 space-y-4 sticky top-8">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-blue-500" />
+              Your Location
+            </h3>
+            
+            {/* Current Location Map */}
+            <div className="bg-gray-100 rounded-2xl overflow-hidden h-64">
+              <MapComponent
+                center={passengerLocation}
+                zoom={16}
+                markers={[
+                  {
+                    id: 'you',
+                    position: passengerLocation,
+                    label: 'You',
+                    type: 'passenger'
+                  }
+                ]}
+                height="100%"
+                showMapTypeControl={true}
+                showNearbyDrivers={false}
+              />
+            </div>
+
+            {/* Location Details */}
+            <div className="space-y-3">
+              <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Latitude</p>
+                <p className="text-sm font-semibold text-blue-900">{passengerLocation.lat.toFixed(6)}</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100">
+                <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Longitude</p>
+                <p className="text-sm font-semibold text-blue-900">{passengerLocation.lng.toFixed(6)}</p>
+              </div>
+            </div>
+
+            {/* Copy Location Button */}
+            <button
+              onClick={() => {
+                const coords = `${passengerLocation.lat}, ${passengerLocation.lng}`;
+                navigator.clipboard.writeText(coords);
+                alert('Location copied to clipboard!');
+              }}
+              className="w-full py-3 bg-black text-white rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+            >
+              <MapPin className="w-4 h-4" />
+              Copy Coordinates
+            </button>
+          </div>
+        )}
+
+        {/* Nearby Drivers Count */}
+        {onlineRiders.length > 0 && (
+          <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-[2.5rem] p-6 border border-emerald-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-emerald-900">Nearby Drivers</h3>
+              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                {onlineRiders.length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {onlineRiders.slice(0, 3).map((rider) => (
+                <div key={rider.uid} className="flex items-center justify-between p-3 bg-white rounded-xl border border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    {rider.avatarUrl ? (
+                      <img src={rider.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-emerald-200" />
+                    )}
+                    <span className="font-semibold text-gray-900 text-sm">{rider.name}</span>
+                  </div>
+                  {rider.rating && (
+                    <span className="text-xs font-bold text-amber-600">⭐ {rider.rating}</span>
+                  )}
+                </div>
+              ))}
+              {onlineRiders.length > 3 && (
+                <p className="text-center text-xs text-emerald-700 font-semibold pt-2">
+                  +{onlineRiders.length - 3} more available
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Estimated Fare */}
+        {estimatedFare !== null && (
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-[2.5rem] p-6 border border-blue-200">
+            <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">Estimated Fare</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-black text-blue-900">${estimatedFare}</span>
+              <span className="text-sm text-blue-600">USD</span>
+            </div>
+            <p className="text-[10px] text-blue-600 mt-3 opacity-75">Based on current rates and route</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

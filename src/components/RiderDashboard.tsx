@@ -81,9 +81,39 @@ export default function RiderDashboard({ user, profile }: Props) {
       const active = rides.find(r => ['accepted', 'arrived', 'ongoing'].includes(r.status));
       if (active && active.status !== lastStatusRef.current) {
         if (active.status === 'arrived') {
-          addNotification(t('riderArrivedNotify'), 'You have marked yourself as arrived at the pickup location.', 'info');
+          addNotification(
+            t('riderArrivedNotify'), 
+            'You have marked yourself as arrived at the pickup location.', 
+            'info',
+            [{
+              label: 'Confirm Arrival',
+              onClick: async () => {
+                try {
+                  await updateRideStatus(active.id, 'arrived');
+                } catch (err) {
+                  console.error('Error confirming arrival:', err);
+                }
+              },
+              style: 'primary'
+            }]
+          );
         } else if (active.status === 'ongoing') {
-          addNotification(t('tripStartedNotify'), 'You have started the ride with the passenger.', 'info');
+          addNotification(
+            t('tripStartedNotify'), 
+            'You have started the ride with the passenger.', 
+            'info',
+            [{
+              label: 'Trip Started',
+              onClick: async () => {
+                try {
+                  await updateRideStatus(active.id, 'ongoing');
+                } catch (err) {
+                  console.error('Error confirming trip start:', err);
+                }
+              },
+              style: 'primary'
+            }]
+          );
         }
         lastStatusRef.current = active.status;
       }
