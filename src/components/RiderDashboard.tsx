@@ -459,8 +459,8 @@ export default function RiderDashboard({ user, profile }: Props) {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('earned')}</p>
-                <p className="text-3xl font-bold text-emerald-400">${activeRide.fare}</p>
+                <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('fareToBeNegotiated')}</p>
+                <p className="text-lg font-bold text-emerald-400">{t('byAgreement')}</p>
               </div>
             </div>
 
@@ -714,8 +714,8 @@ export default function RiderDashboard({ user, profile }: Props) {
                       <p className="text-xs text-gray-400">~ 2.4 bits {t('away')}</p>
                     </div>
                   </div>
-                  <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold text-lg">
-                    ${ride.fare}
+                  <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm">
+                    {t('byAgreement')}
                   </div>
                 </div>
 

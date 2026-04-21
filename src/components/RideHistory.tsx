@@ -94,13 +94,17 @@ export default function RideHistory({ user, profile }: Props) {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold dark:text-white">
-                    {ride.discountAmount ? (
+                    {ride.fare > 0 ? (
+                      ride.discountAmount ? (
                       <span className="flex flex-col">
                         <span>${ride.fare}</span>
                         <span className="text-[10px] text-emerald-500 line-through opacity-50">${ride.fare + ride.discountAmount}</span>
                       </span>
-                    ) : (
+                      ) : (
                       `$${ride.fare}`
+                      )
+                    ) : (
+                      t('byAgreement')
                     )}
                   </p>
                   <p className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-widest">{profile.role === 'rider' ? t('earned') : t('paid')}</p>
@@ -211,13 +215,20 @@ export default function RideHistory({ user, profile }: Props) {
 
               <div className="grid grid-cols-2 gap-4 mb-10">
                 <div className="bg-gray-50 dark:bg-zinc-800 p-5 rounded-3xl">
-                  <p className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-widest mb-1">{t('totalFare')}</p>
-                  <p className="text-3xl font-bold dark:text-white">${selectedRide.fare}</p>
-                  {selectedRide.promoCode && (
+                  <p className="text-[10px] text-gray-400 dark:text-zinc-500 font-bold uppercase tracking-widest mb-1">
+                    {selectedRide.fare > 0 ? t('totalFare') : t('fareToBeNegotiated')}
+                  </p>
+                  <p className="text-3xl font-bold dark:text-white">
+                    {selectedRide.fare > 0 ? `$${selectedRide.fare}` : t('byAgreement')}
+                  </p>
+                  {selectedRide.fare > 0 && selectedRide.promoCode && (
                     <div className="inline-flex items-center gap-1.5 mt-2 bg-emerald-500/10 text-emerald-600 px-2 py-1 rounded-lg text-[10px] font-bold">
                       <Tag className="w-3 h-3" />
                       PROMO: {selectedRide.promoCode}
                     </div>
+                  )}
+                  {selectedRide.fare <= 0 && (
+                    <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">{t('fareNegotiationMessage')}</p>
                   )}
                 </div>
                 <div className="bg-gray-50 dark:bg-zinc-800 p-5 rounded-3xl">

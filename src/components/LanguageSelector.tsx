@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
 import { Language } from '../constants/translations';
-import { Languages, ChevronRight, Globe } from 'lucide-react';
+import { Languages, ChevronRight } from 'lucide-react';
 
 export default function LanguageSelector() {
   const { setLanguage } = useLanguage();
@@ -21,8 +21,12 @@ export default function LanguageSelector() {
         className="w-full max-w-md bg-white rounded-[3rem] p-8 sm:p-12 shadow-2xl space-y-10"
       >
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-black rounded-[2rem] flex items-center justify-center mx-auto shadow-xl shadow-black/10">
-            <Globe className="w-10 h-10 text-white animate-pulse" />
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-black shadow-xl shadow-black/10">
+            <img
+              src="/ntwara-logo.png"
+              alt="Ntwara"
+              className="h-14 w-14 object-contain"
+            />
           </div>
           <div>
             <h1 className="text-3xl font-black tracking-tight text-gray-900">Ntwara</h1>

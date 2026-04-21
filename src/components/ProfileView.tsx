@@ -19,6 +19,12 @@ export default function ProfileView({ profile }: Props) {
   const [newName, setNewName] = useState(profile.name || '');
   const [newPhone, setNewPhone] = useState(profile.phoneNumber || '');
   const [newAvatar, setNewAvatar] = useState(profile.avatarUrl || '');
+  const [newGender, setNewGender] = useState(profile.gender || '');
+  const [newVehicleType, setNewVehicleType] = useState<'car' | 'motorcycle'>(profile.vehicleType || 'car');
+  const [newVehicleModel, setNewVehicleModel] = useState(profile.vehicleModel || '');
+  const [newNumberPlate, setNewNumberPlate] = useState(profile.numberPlate || '');
+  const [newLicenseClass, setNewLicenseClass] = useState(profile.licenseClass || '');
+  const [newPermitCardNumber, setNewPermitCardNumber] = useState(profile.permitCardNumber || '');
   
   const [isSaving, setIsSaving] = useState(false);
   const [favoriteDrivers, setFavoriteDrivers] = useState<UserProfile[]>([]);
@@ -28,6 +34,12 @@ export default function ProfileView({ profile }: Props) {
     setNewName(profile.name || '');
     setNewPhone(profile.phoneNumber || '');
     setNewAvatar(profile.avatarUrl || '');
+    setNewGender(profile.gender || '');
+    setNewVehicleType(profile.vehicleType || 'car');
+    setNewVehicleModel(profile.vehicleModel || '');
+    setNewNumberPlate(profile.numberPlate || '');
+    setNewLicenseClass(profile.licenseClass || '');
+    setNewPermitCardNumber(profile.permitCardNumber || '');
     setEmergencyName(profile.emergencyContact?.name || '');
     setEmergencyPhone(profile.emergencyContact?.phone || '');
   }, [profile]);
@@ -58,14 +70,39 @@ export default function ProfileView({ profile }: Props) {
     { label: t('memberSince'), value: '2026', icon: Calendar, color: 'text-emerald-500' },
   ];
 
+  const resetProfileForm = () => {
+    setNewName(profile.name || '');
+    setNewPhone(profile.phoneNumber || '');
+    setNewAvatar(profile.avatarUrl || '');
+    setNewGender(profile.gender || '');
+    setNewVehicleType(profile.vehicleType || 'car');
+    setNewVehicleModel(profile.vehicleModel || '');
+    setNewNumberPlate(profile.numberPlate || '');
+    setNewLicenseClass(profile.licenseClass || '');
+    setNewPermitCardNumber(profile.permitCardNumber || '');
+  };
+
+  const closeProfileEditor = () => {
+    resetProfileForm();
+    setIsEditingProfile(false);
+  };
+
   const handleSaveProfile = async () => {
     if (!newName) return;
     setIsSaving(true);
     try {
       await updateDoc(doc(db, 'users', profile.uid), {
-        name: newName,
-        phoneNumber: newPhone,
-        avatarUrl: newAvatar,
+        name: newName.trim(),
+        phoneNumber: newPhone.trim(),
+        avatarUrl: newAvatar.trim(),
+        gender: newGender,
+        ...(profile.role === 'rider' ? {
+          vehicleType: newVehicleType,
+          vehicleModel: newVehicleModel.trim(),
+          numberPlate: newNumberPlate.trim().toUpperCase(),
+          licenseClass: newLicenseClass.trim(),
+          permitCardNumber: newPermitCardNumber.trim(),
+        } : {}),
         updatedAt: serverTimestamp()
       });
       setIsEditingProfile(false);
@@ -119,7 +156,10 @@ export default function ProfileView({ profile }: Props) {
               )}
             </div>
             <button 
-              onClick={() => setIsEditingProfile(true)}
+              onClick={() => {
+                resetProfileForm();
+                setIsEditingProfile(true);
+              }}
               className="bg-black dark:bg-white text-white dark:text-black px-4 py-2 rounded-2xl shadow-lg border border-white/10 font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-all active:scale-95"
             >
               <Edit2 className="w-3.5 h-3.5" />
@@ -392,7 +432,7 @@ export default function ProfileView({ profile }: Props) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setIsEditingProfile(false)}
+              onClick={closeProfileEditor}
             />
             <motion.div 
               initial={{ opacity: 0, y: 100 }}
@@ -406,7 +446,7 @@ export default function ProfileView({ profile }: Props) {
                   <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">{t('personalIdentity')}</p>
                 </div>
                 <button 
-                  onClick={() => setIsEditingProfile(false)}
+                  onClick={closeProfileEditor}
                   className="w-10 h-10 bg-gray-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center text-gray-400"
                 >
                   <X className="w-5 h-5" />
@@ -415,18 +455,18 @@ export default function ProfileView({ profile }: Props) {
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Full Name</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('fullName')}</label>
                   <input 
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     className="w-full bg-gray-50 dark:bg-zinc-900 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
-                    placeholder="Enter your name"
+                    placeholder={t('fullName')}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Phone Number</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('phone')}</label>
                   <input 
                     type="tel"
                     value={newPhone}
@@ -437,7 +477,20 @@ export default function ProfileView({ profile }: Props) {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Avatar URL</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('gender')}</label>
+                  <select
+                    value={newGender}
+                    onChange={(e) => setNewGender(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-zinc-900 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
+                  >
+                    <option value="">{t('gender')}</option>
+                    <option value="male">{t('male')}</option>
+                    <option value="female">{t('female')}</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('profilePhotoUrl')}</label>
                   <div className="flex gap-4">
                     <input 
                       type="url"
@@ -452,6 +505,72 @@ export default function ProfileView({ profile }: Props) {
                   </div>
                 </div>
 
+                {profile.role === 'rider' && (
+                  <div className="space-y-6 rounded-[2rem] border border-gray-100 bg-gray-50/70 p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-400 dark:text-zinc-500">
+                        {t('vehicleIntelligence')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('vehicleTypeLabel')}</label>
+                      <select
+                        value={newVehicleType}
+                        onChange={(e) => setNewVehicleType(e.target.value as 'car' | 'motorcycle')}
+                        className="w-full bg-white dark:bg-zinc-950 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
+                      >
+                        <option value="car">{t('car')}</option>
+                        <option value="motorcycle">{t('motorcycle')}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('vehicleModel')}</label>
+                      <input
+                        type="text"
+                        value={newVehicleModel}
+                        onChange={(e) => setNewVehicleModel(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-950 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
+                        placeholder={t('vehicleModelPlaceholder')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('registrationPlate')}</label>
+                      <input
+                        type="text"
+                        value={newNumberPlate}
+                        onChange={(e) => setNewNumberPlate(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-950 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold uppercase text-gray-900 dark:text-white transition-all outline-none"
+                        placeholder={t('numberPlatePlaceholder')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('licenseClass')}</label>
+                      <input
+                        type="text"
+                        value={newLicenseClass}
+                        onChange={(e) => setNewLicenseClass(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-950 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
+                        placeholder={t('licenseClass')}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">{t('permitCardNumber')}</label>
+                      <input
+                        type="text"
+                        value={newPermitCardNumber}
+                        onChange={(e) => setNewPermitCardNumber(e.target.value)}
+                        className="w-full bg-white dark:bg-zinc-950 border-2 border-transparent focus:border-black dark:focus:border-white rounded-2xl px-6 py-4 font-bold text-gray-900 dark:text-white transition-all outline-none"
+                        placeholder={t('permitCardNumber')}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-4 pt-6">
                   <button 
                     onClick={handleSaveProfile}
@@ -460,6 +579,13 @@ export default function ProfileView({ profile }: Props) {
                   >
                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     {t('saveChanges')}
+                  </button>
+                  <button
+                    onClick={closeProfileEditor}
+                    type="button"
+                    className="px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-500 transition-all hover:bg-gray-50 dark:text-zinc-400 dark:hover:bg-zinc-900"
+                  >
+                    {t('cancel')}
                   </button>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, MouseEvent, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, validatePromoCode, PromoCode, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
-import { MapPin, Navigation, Clock, CreditCard, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Tag, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike  } from 'lucide-react';
+import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
+import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike  } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -54,7 +54,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
     delete notificationSentRef.current[rideId];
   };
   const [isRequesting, setIsRequesting] = useState(false);
-  const [estimatedFare, setEstimatedFare] = useState<number | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
@@ -68,12 +67,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
   // Location logic
   const [isLocating, setIsLocating] = useState(false);
-
-  // Promo logic
-  const [promoInput, setPromoInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null);
-  const [promoError, setPromoError] = useState('');
-  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
 
   // Map Pins
   const [isPickingOnMap, setIsPickingOnMap] = useState<'pickup' | 'destination' | null>(null);
@@ -217,40 +210,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
       }
     );
   };
-
-  // Sophisticated fare calculation logic
-  useEffect(() => {
-    if (pickup && destination) {
-      const distanceKey = `${pickup.trim()}-${destination.trim()}`.toLowerCase();
-      let hash = 0;
-      for (let i = 0; i < distanceKey.length; i++) {
-        hash = (hash << 5) - hash + distanceKey.charCodeAt(i);
-        hash |= 0;
-      }
-      const mockDistance = Math.abs(hash % 15) + 2;
-      const baseFare = 5;
-      const perKm = 1.5;
-      const hour = new Date().getHours();
-      let multiplier = 1.0;
-      if ((hour >= 7 && hour <= 10) || (hour >= 16 && hour <= 19)) multiplier = 1.5;
-      else if (hour >= 23 || hour <= 5) multiplier = 1.2;
-      
-      let fare = Math.round((baseFare + mockDistance * perKm) * multiplier);
-      
-      // Apply discount
-      if (appliedPromo) {
-        if (appliedPromo.discountType === 'percentage') {
-          fare = Math.round(fare * (1 - appliedPromo.value / 100));
-        } else {
-          fare = Math.max(0, fare - appliedPromo.value);
-        }
-      }
-      
-      setEstimatedFare(fare);
-    } else {
-      setEstimatedFare(null);
-    }
-  }, [pickup, destination, appliedPromo]);
 
   useEffect(() => {
     // Only subscribe to all online riders if we don't have an active ride
@@ -426,27 +385,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
     }
   }, [riderProfile?.currentLocation?.lat, riderProfile?.currentLocation?.lng, activeRide?.destination?.lat, activeRide?.destination?.lng]);
 
-  const handleApplyPromo = async () => {
-    if (!promoInput) return;
-    setIsValidatingPromo(true);
-    setPromoError('');
-    try {
-      const promo = await validatePromoCode(promoInput);
-      if (promo) {
-        setAppliedPromo(promo);
-        setPromoInput('');
-      } else {
-        setPromoError('Invalid or expired promo code');
-      }
-    } catch (e) {
-      setPromoError('Error validating promo code');
-    } finally {
-      setIsValidatingPromo(false);
-    }
-  };
-
   const handleRequestRide = async () => {
-    if (!pickup || !destination || estimatedFare === null) return;
+    if (!pickup || !destination) return;
     setIsRequesting(true);
     try {
       await createRideRequest({
@@ -454,14 +394,11 @@ export default function PassengerDashboard({ user, profile }: Props) {
         pickup: { address: pickup, lat: passengerLocation?.lat || 0, lng: passengerLocation?.lng || 0 },
         destination: { address: destination, lat: 0, lng: 0 },
         status: 'requested',
-        fare: estimatedFare,
+        fare: 0,
         vehicleType: vehicleType,
-        ...(appliedPromo && { promoCode: appliedPromo.code }),
-        ...(appliedPromo && { discountAmount: (estimatedFare / (1 - (appliedPromo.discountType === 'percentage' ? appliedPromo.value / 100 : 0)) - estimatedFare) })
       });
       setPickup('');
       setDestination('');
-      setAppliedPromo(null);
     } catch (error) {
       console.error("Failed to request ride", error);
     } finally {
@@ -605,7 +542,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
             <CheckCircle2 className="w-10 h-10" />
           </div>
           <h2 className="text-2xl font-bold">{t('tripCompletedNotify')}</h2>
-          <p className="text-gray-500">Rate your journey with SwiftRide</p>
+          <p className="text-gray-500">Rate your journey with Ntwara</p>
         </div>
 
         <div className="space-y-6">
@@ -894,15 +831,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
             <div className="pt-6 border-t border-white/10 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('totalFare')}</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-3xl font-bold">${activeRide.fare}</p>
-                    {activeRide.promoCode && (
-                      <div className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide">
-                        Promo: {activeRide.promoCode}
-                      </div>
-                    )}
-                  </div>
+                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('fareToBeNegotiated')}</p>
+                  <p className="text-lg font-bold text-emerald-400">{t('byAgreement')}</p>
+                  <p className="text-xs text-white/40 mt-1">{t('negotiateOnArrival')}</p>
                 </div>
                 {['requested', 'accepted', 'arrived'].includes(activeRide.status) && (
                   <button 
@@ -1290,66 +1221,23 @@ export default function PassengerDashboard({ user, profile }: Props) {
         </div>
       )}
 
-      {/* Promo Code UI */}
-      {!appliedPromo ? (
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
-            <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input 
-              type="text"
-              placeholder={t('promoPlaceholder' as any) || "Promo code"}
-              value={promoInput}
-              onChange={(e) => setPromoInput(e.target.value)}
-              className="w-full bg-white border border-gray-100 py-4 pl-12 pr-4 rounded-2xl outline-none focus:ring-2 focus:ring-black transition-all text-sm"
-            />
-          </div>
-          <button 
-            onClick={handleApplyPromo}
-            disabled={!promoInput || isValidatingPromo}
-            className="bg-gray-900 text-white px-6 rounded-2xl font-bold text-sm disabled:opacity-50"
-          >
-            {isValidatingPromo ? <Loader2 className="w-5 h-5 animate-spin" /> : t('apply')}
-          </button>
-        </div>
-      ) : (
-        <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center">
-              <Tag className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-emerald-900">Promo Applied: {appliedPromo.code}</p>
-              <p className="text-xs text-emerald-600">
-                {appliedPromo.discountType === 'percentage' ? `${appliedPromo.value}% off` : `$${appliedPromo.value} off`} your ride
-              </p>
-            </div>
-          </div>
-          <button onClick={() => setAppliedPromo(null)} className="p-2 text-emerald-400 hover:text-emerald-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
-      {promoError && <p className="text-xs text-red-500 px-4 -mt-4">{promoError}</p>}
-
-      {estimatedFare !== null && (
+      {pickup && destination && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="bg-black text-white p-8 rounded-[2.5rem] flex items-center justify-between shadow-2xl shadow-black/20"
         >
           <div>
-            <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('totalFare')}</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-bold">${estimatedFare}</p>
-              {appliedPromo && <p className="text-sm text-white/40 line-through">${estimatedFare + (appliedPromo.discountType === 'percentage' ? Math.round(estimatedFare / (1 - appliedPromo.value / 100) - estimatedFare) : appliedPromo.value)}</p>}
-            </div>
+            <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('fareToBeNegotiated')}</p>
+            <p className="text-3xl font-bold">{t('byAgreement')}</p>
+            <p className="mt-2 text-sm text-white/60">{t('fareNegotiationMessage')}</p>
           </div>
           <div className="text-right">
             <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-1 bg-white/5 py-1 px-3 rounded-full">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Swift Match</span>
+              <span>Ntwara Match</span>
             </div>
-            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Includes dynamic fee</p>
+            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">{t('negotiateOnArrival')}</p>
           </div>
         </motion.div>
       )}
