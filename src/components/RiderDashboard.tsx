@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus, updateDriverStatus } from '../lib/firebase';
-import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target, Phone } from 'lucide-react';
+import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus, updateDriverStatus, reverseGeocode } from '../lib/firebase';
+import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target, Phone, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -25,7 +25,9 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [availableRides, setAvailableRides] = useState<Ride[]>([]);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [passengerProfile, setPassengerProfile] = useState<UserProfile | null>(null);
-  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
+  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>([]);
+  const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(profile.currentLocation || null);
+  const [isPickingOnMap, setIsPickingOnMap] = useState<boolean>(false);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
   // Track which rides have had their end confirmation notification sent
@@ -37,6 +39,26 @@ export default function RiderDashboard({ user, profile }: Props) {
     { id: 'Safe Driver', earned: profile.totalTrips >= 5 },
     { id: 'Elite Status', earned: profile.rating >= 4.9 }
   ];
+
+  const handleMapClick = async (e: MouseEvent) => {
+    if (!isPickingOnMap) return;
+    
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const lng = (x / 5000) - 0.1278;
+    const lat = (y / 5000) + 51.5074;
+
+    try {
+      const address = await reverseGeocode(lat, lng);
+      setRiderLocation({ lat, lng });
+      await updateUserLocation(user.uid, lat, lng);
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+    setIsPickingOnMap(false);
+  };
 
   useEffect(() => {
     const earnedBadgeIds = possibleBadges.filter(b => b.earned).map(b => b.id);
@@ -590,9 +612,66 @@ export default function RiderDashboard({ user, profile }: Props) {
             />
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 text-sm text-white/80">
-            <p className="font-semibold">Waiting for ride requests...</p>
-            <p className="text-xs text-white/50">Your location is visible to nearby passengers</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-semibold">Waiting for ride requests...</p>
+                <p className="text-xs text-white/50">Your location is visible to nearby passengers</p>
+              </div>
+              <button
+                onClick={() => setIsPickingOnMap(!isPickingOnMap)}
+                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${isPickingOnMap ? 'bg-emerald-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}
+              >
+                {isPickingOnMap ? 'Cancel' : 'Pick Location'}
+              </button>
+            </div>
           </div>
+        </motion.div>
+      )}
+
+      {/* Map Location Picker */}
+      {isPickingOnMap && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="bg-gray-900 rounded-[2rem] overflow-hidden relative cursor-crosshair border-4 border-black"
+          onClick={handleMapClick}
+        >
+          <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
+            <div className="space-y-4 mb-8">
+              <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
+              <div>
+                <p className="font-bold uppercase tracking-widest text-[10px] text-white">Click on the map to set your location</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-200 border border-red-500/30 text-[8px] font-bold uppercase tracking-wider">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                Live Traffic
+              </div>
+              {riderLocation && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[8px] font-bold uppercase tracking-wider">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Your Location
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
+          
+          {riderLocation && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2" style={{ marginLeft: -40 }}>
+              <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/50" />
+              <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest">You</span>
+            </div>
+          )}
+
+          <button 
+            onClick={(e) => { e.stopPropagation(); setIsPickingOnMap(false); }}
+            className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </motion.div>
       )}
 

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 export { doc, updateDoc };
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -203,11 +203,29 @@ export async function updateRideStatus(rideId: string, status: RideStatus, rider
 
 export async function rateRide(rideId: string, rating: number, reason: RatingReason): Promise<void> {
   try {
-    await updateDoc(doc(db, 'rides', rideId), {
+    // Get the ride document to check status and get passenger ID
+    const rideRef = doc(db, 'rides', rideId);
+    const rideSnap = await getDoc(rideRef);
+    
+    if (!rideSnap.exists()) {
+      throw new Error('Ride not found');
+    }
+    
+    const ride = rideSnap.data() as Ride;
+    
+    // Update ride with rating
+    await updateDoc(rideRef, {
       riderRating: rating,
       ratingReason: reason,
       updatedAt: serverTimestamp()
     });
+    
+    // Only increment totalTrips for completed rides, not cancelled ones
+    if (ride.status === 'completed' && ride.passengerId) {
+      await updateDoc(doc(db, 'users', ride.passengerId), {
+        totalTrips: increment(1)
+      });
+    }
   } catch (error) {
     return handleFirestoreError(error, 'update', `rides/${rideId}`);
   }
