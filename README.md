@@ -2,7 +2,7 @@
 
 <img width="1200" height="475" alt="Ntwara Banner" src="https://i.ibb.co/qYN9hjsH/Chat-GPT-Image-Apr-19-2026-03-11-30-PM.png" />
 
-<h1 style="font-size: 48px; margin-top: 10px;">🚖 Ntwara</h1>
+<h1 style="font-size: 48px; margin-top: 10px;"> Ntwara</h1>
 
 <p style="font-size:18px; max-width:700px;">
 Ihuza abagenzi n’abamotari cyangwa abatwara imodoka mu buryo bwihuse kandi bworoshye.
