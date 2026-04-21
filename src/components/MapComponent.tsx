@@ -1,23 +1,7 @@
-import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF } from '@react-google-maps/api';
-import { useState, useEffect, useRef } from 'react';
+import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF, MarkerF } from '@react-google-maps/api';
+import { useState } from 'react';
 import { UserProfile } from '../lib/firebase';
 import { Satellite, Map as MapIcon } from 'lucide-react';
-
-// TypeScript declarations for AdvancedMarkerElement
-declare global {
-  namespace google.maps {
-    namespace marker {
-      class AdvancedMarkerElement {
-        constructor(options: any);
-        map: any;
-        position: any;
-        title: string;
-        content: HTMLElement;
-        addListener(event: string, callback: () => void): void;
-      }
-    }
-  }
-}
 
 interface MapMarker {
   id: string;
@@ -61,12 +45,9 @@ export default function MapComponent({
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<Map<string, any>>(new Map());
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'ntwara-google-maps-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-    libraries: ['marker']
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY
   });
 
   const getMarkerColor = (type: string) => {
@@ -88,45 +69,6 @@ export default function MapComponent({
     setSelectedMarker(marker);
     onMarkerClick?.(marker);
   };
-
-  // Create and manage AdvancedMarkerElements
-  useEffect(() => {
-    if (!mapRef.current || !window.google?.maps?.marker?.AdvancedMarkerElement) return;
-
-    // Clear existing markers
-    markersRef.current.forEach((marker) => {
-      marker.map = null;
-    });
-    markersRef.current.clear();
-
-    // Create new markers using AdvancedMarkerElement
-    markers.forEach((marker) => {
-      try {
-        const markerColor = getMarkerColor(marker.type);
-        
-        // Create a div element for the marker content
-        const markerDiv = document.createElement('div');
-        markerDiv.style.width = '32px';
-        markerDiv.style.height = '32px';
-        markerDiv.style.backgroundImage = `url('${markerColor}')`;
-        markerDiv.style.backgroundSize = 'contain';
-        markerDiv.style.backgroundRepeat = 'no-repeat';
-        markerDiv.style.cursor = 'pointer';
-
-        const advancedMarker = new window.google.maps.marker.AdvancedMarkerElement({
-          map: mapRef.current,
-          position: marker.position,
-          title: marker.label,
-          content: markerDiv
-        });
-
-        advancedMarker.addListener('click', () => handleMarkerClick(marker));
-        markersRef.current.set(marker.id, advancedMarker);
-      } catch (error) {
-        console.error('Error creating marker:', error);
-      }
-    });
-  }, [markers, isLoaded]);
 
   if (loadError) {
     return (
@@ -191,7 +133,6 @@ export default function MapComponent({
         </div>
       )}
       <GoogleMap
-        ref={mapRef}
         mapContainerStyle={{
           width: '100%',
           height: '100%',
@@ -247,7 +188,19 @@ export default function MapComponent({
         />
       ))}
 
-      {/* AdvancedMarkerElements are now managed via useEffect */}
+      {markers.map((marker) => (
+        <MarkerF
+          key={marker.id}
+          position={marker.position}
+          title={marker.label}
+          icon={{
+            url: getMarkerColor(marker.type),
+            scaledSize: new window.google.maps.Size(32, 32)
+          }}
+          onClick={() => handleMarkerClick(marker)}
+        />
+      ))}
+
       {/* InfoWindow for selected marker */}
       {selectedMarker?.profile && (
         <InfoWindowF
