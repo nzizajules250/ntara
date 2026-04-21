@@ -25,7 +25,7 @@ export default function LanguageSelector() {
             <Globe className="w-10 h-10 text-white animate-pulse" />
           </div>
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900">SwiftRide</h1>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900">Ntwara</h1>
             <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-2">Choose your experience</p>
           </div>
         </div>
