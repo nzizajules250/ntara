@@ -133,9 +133,9 @@ function AppContent() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <Download className="w-5 h-5 text-emerald-400" />
-                    <p className="font-bold text-sm uppercase tracking-widest">Install SwiftRide</p>
+                    <p className="font-bold text-sm uppercase tracking-widest">Install  Ntwara</p>
                   </div>
-                  <p className="text-xs text-gray-300 mb-4">Install our app for faster access and offline support. Works great on mobile!</p>
+                  <p className="text-xs text-gray-300 mb-4">Install our app for faster access  Works great on mobile!</p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleInstallApp}

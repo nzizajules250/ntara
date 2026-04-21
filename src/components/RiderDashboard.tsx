@@ -25,9 +25,9 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [availableRides, setAvailableRides] = useState<Ride[]>([]);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [passengerProfile, setPassengerProfile] = useState<UserProfile | null>(null);
-  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(profile.currentLocation || null);
   const [isPickingOnMap, setIsPickingOnMap] = useState<boolean>(false);
+  const [selectedRidePreviewId, setSelectedRidePreviewId] = useState<string | null>(null);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
   // Track which rides have had their end confirmation notification sent
@@ -206,19 +206,16 @@ export default function RiderDashboard({ user, profile }: Props) {
     }
   }, [activeRide?.passengerId]);
 
-  // Calculate route from driver current location to destination
   useEffect(() => {
-    if (
-      activeRide &&
-      ['accepted', 'arrived', 'ongoing'].includes(activeRide.status) &&
-      profile.currentLocation &&
-      activeRide.destination &&
-      hasValidCoordinates(profile.currentLocation) &&
-      hasValidCoordinates(activeRide.destination)
-    ) {
-      fetchRoute(profile.currentLocation, activeRide.destination);
+    if (availableRides.length === 0) {
+      setSelectedRidePreviewId(null);
+      return;
     }
-  }, [profile.currentLocation, activeRide?.destination, activeRide?.status]);
+
+    if (!selectedRidePreviewId || !availableRides.some((ride) => ride.id === selectedRidePreviewId)) {
+      setSelectedRidePreviewId(availableRides[0].id);
+    }
+  }, [availableRides, selectedRidePreviewId]);
 
   const handleToggleFavorite = async (targetUserId: string) => {
     const isFavorite = profile.favoriteUserIds?.includes(targetUserId);
@@ -246,56 +243,6 @@ export default function RiderDashboard({ user, profile }: Props) {
       });
     } catch (error) {
       console.error("Failed to accept", error);
-    }
-  };
-
-  // Fetch and display route from driver to destination
-  const fetchRoute = async (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
-    try {
-      const apiKey = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${start.lat},${start.lng}&destination=${end.lat},${end.lng}&key=${apiKey}`
-      );
-      const data = await response.json();
-      
-      if (data.routes && data.routes.length > 0) {
-        const points: { lat: number; lng: number }[] = [];
-        const encodedPolyline = data.routes[0].overview_polyline.points;
-        
-        // Decode polyline
-        let index = 0, lat = 0, lng = 0;
-        for (let i = 0; i < encodedPolyline.length; i++) {
-          let result = 0;
-          let shift = 0;
-          let byte;
-          do {
-            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-          } while (byte >= 0x20);
-          lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-          
-          result = 0;
-          shift = 0;
-          i++;
-          do {
-            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-          } while (byte >= 0x20);
-          lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-          
-          points.push({ lat: lat / 1e5, lng: lng / 1e5 });
-        }
-        
-        setRoutes([{
-          id: 'active-route',
-          points: points,
-          color: '#10b981'
-        }]);
-      }
-    } catch (err) {
-      console.error('Error fetching route:', err);
     }
   };
 
@@ -339,6 +286,14 @@ export default function RiderDashboard({ user, profile }: Props) {
   };
 
   if (activeRide) {
+    const ridePickupLocation =
+      hasValidCoordinates(activeRide.pickup)
+        ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng }
+        : null;
+    const rideDestination =
+      hasValidCoordinates(activeRide.destination)
+        ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng }
+        : null;
     const rideMapMarkers = [
       ...(hasValidCoordinates(profile.currentLocation) ? [{
         id: 'rider-live',
@@ -347,18 +302,50 @@ export default function RiderDashboard({ user, profile }: Props) {
         type: 'rider' as const,
         profile
       }] : []),
-      ...(hasValidCoordinates(activeRide.pickup) ? [{
+      ...(ridePickupLocation ? [{
         id: 'pickup',
-        position: { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng },
+        position: ridePickupLocation,
         label: activeRide.pickup.address,
         type: 'passenger' as const
       }] : []),
-      ...(hasValidCoordinates(activeRide.destination) ? [{
+      ...(rideDestination ? [{
         id: 'destination',
-        position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng },
+        position: rideDestination,
         label: activeRide.destination.address,
-        type: 'nearby' as const
+        type: 'destination' as const
       }] : [])
+    ];
+    const activeRideDirectionRequests = [
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
+      hasValidCoordinates(profile.currentLocation) &&
+      ridePickupLocation
+        ? [{
+            id: `rider-driver-to-pickup-${activeRide.id}`,
+            origin: profile.currentLocation!,
+            destination: ridePickupLocation,
+            color: '#10b981'
+          }]
+        : []),
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
+      ridePickupLocation &&
+      rideDestination
+        ? [{
+            id: `rider-pickup-to-destination-${activeRide.id}`,
+            origin: ridePickupLocation,
+            destination: rideDestination,
+            color: '#60a5fa'
+          }]
+        : []),
+      ...(activeRide.status === 'ongoing' &&
+      hasValidCoordinates(profile.currentLocation) &&
+      rideDestination
+        ? [{
+            id: `rider-live-trip-${activeRide.id}`,
+            origin: profile.currentLocation!,
+            destination: rideDestination,
+            color: '#2563eb'
+          }]
+        : [])
     ];
 
     const rideMapCenter =
@@ -412,7 +399,7 @@ export default function RiderDashboard({ user, profile }: Props) {
                 zoom={15}
                 showNearbyDrivers={false}
                 height="240px"
-                routes={routes}
+                directionRequests={activeRideDirectionRequests}
               />
             </div>
           ) : (
@@ -511,6 +498,55 @@ export default function RiderDashboard({ user, profile }: Props) {
       </div>
     );
   }
+
+  const previewRide = availableRides.find((ride) => ride.id === selectedRidePreviewId) || availableRides[0] || null;
+  const previewPickupLocation =
+    previewRide && hasValidCoordinates(previewRide.pickup)
+      ? { lat: previewRide.pickup.lat, lng: previewRide.pickup.lng }
+      : null;
+  const previewDestinationLocation =
+    previewRide && hasValidCoordinates(previewRide.destination)
+      ? { lat: previewRide.destination.lat, lng: previewRide.destination.lng }
+      : null;
+  const previewMapMarkers = [
+    ...(profile.currentLocation && hasValidCoordinates(profile.currentLocation) ? [{
+      id: 'driver-live',
+      position: profile.currentLocation,
+      label: profile.name,
+      type: 'rider' as const,
+      profile
+    }] : []),
+    ...(previewPickupLocation ? [{
+      id: `preview-pickup-${previewRide?.id}`,
+      position: previewPickupLocation,
+      label: previewRide?.pickup.address || 'Pickup',
+      type: 'passenger' as const
+    }] : []),
+    ...(previewDestinationLocation ? [{
+      id: `preview-destination-${previewRide?.id}`,
+      position: previewDestinationLocation,
+      label: previewRide?.destination.address || 'Destination',
+      type: 'destination' as const
+    }] : [])
+  ];
+  const previewDirectionRequests = [
+    ...(profile.currentLocation && hasValidCoordinates(profile.currentLocation) && previewPickupLocation
+      ? [{
+          id: `preview-driver-to-pickup-${previewRide?.id || 'route'}`,
+          origin: profile.currentLocation,
+          destination: previewPickupLocation,
+          color: '#10b981'
+        }]
+      : []),
+    ...(previewPickupLocation && previewDestinationLocation
+      ? [{
+          id: `preview-trip-${previewRide?.id || 'route'}`,
+          origin: previewPickupLocation,
+          destination: previewDestinationLocation,
+          color: '#60a5fa'
+        }]
+      : [])
+  ];
 
   return (
     <div className="space-y-8">

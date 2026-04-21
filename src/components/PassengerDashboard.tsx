@@ -1,4 +1,4 @@
-import { useState, useEffect, MouseEvent, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
 import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike  } from 'lucide-react';
@@ -30,7 +30,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [riderProfile, setRiderProfile] = useState<UserProfile | null>(null);
   const [onlineRiders, setOnlineRiders] = useState<UserProfile[]>([]);
   const [nearbyDrivers, setNearbyDrivers] = useState<UserProfile[]>([]);
-  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
   // Map to track which rides have already had notifications sent for specific events
   const notificationSentRef = useRef<{
     [rideId: string]: Set<string>
@@ -71,6 +70,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   // Map Pins
   const [isPickingOnMap, setIsPickingOnMap] = useState<'pickup' | 'destination' | null>(null);
   const [passengerLocation, setPassengerLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [destinationLocation, setDestinationLocation] = useState<{lat: number, lng: number} | null>(null);
   
   // Saved Locations
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(profile.savedLocations || []);
@@ -134,56 +134,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
       );
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  // Fetch and display route from driver to destination
-  const fetchRoute = async (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
-    try {
-      const apiKey = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${start.lat},${start.lng}&destination=${end.lat},${end.lng}&key=${apiKey}`
-      );
-      const data = await response.json();
-      
-      if (data.routes && data.routes.length > 0) {
-        const points: { lat: number; lng: number }[] = [];
-        const encodedPolyline = data.routes[0].overview_polyline.points;
-        
-        // Decode polyline
-        let index = 0, lat = 0, lng = 0;
-        for (let i = 0; i < encodedPolyline.length; i++) {
-          let result = 0;
-          let shift = 0;
-          let byte;
-          do {
-            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-          } while (byte >= 0x20);
-          lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-          
-          result = 0;
-          shift = 0;
-          i++;
-          do {
-            byte = encodedPolyline.charCodeAt(i) - 63 - 1;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-          } while (byte >= 0x20);
-          lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-          
-          points.push({ lat: lat / 1e5, lng: lng / 1e5 });
-        }
-        
-        setRoutes([{
-          id: 'active-route',
-          points: points,
-          color: '#3b82f6'
-        }]);
-      }
-    } catch (err) {
-      console.error('Error fetching route:', err);
     }
   };
 
@@ -375,16 +325,6 @@ export default function PassengerDashboard({ user, profile }: Props) {
     }
   }, [activeRide?.riderId]);
 
-  // Fetch and update route when driver or destination location changes
-  useEffect(() => {
-    if (riderProfile?.currentLocation && hasValidCoordinates(activeRide?.destination)) {
-      fetchRoute(riderProfile.currentLocation, {
-        lat: activeRide.destination.lat,
-        lng: activeRide.destination.lng
-      });
-    }
-  }, [riderProfile?.currentLocation?.lat, riderProfile?.currentLocation?.lng, activeRide?.destination?.lat, activeRide?.destination?.lng]);
-
   const handleRequestRide = async () => {
     if (!pickup || !destination) return;
     setIsRequesting(true);
@@ -392,13 +332,15 @@ export default function PassengerDashboard({ user, profile }: Props) {
       await createRideRequest({
         passengerId: user.uid,
         pickup: { address: pickup, lat: passengerLocation?.lat || 0, lng: passengerLocation?.lng || 0 },
-        destination: { address: destination, lat: 0, lng: 0 },
+        destination: { address: destination, lat: destinationLocation?.lat || 0, lng: destinationLocation?.lng || 0 },
         status: 'requested',
         fare: 0,
         vehicleType: vehicleType,
       });
       setPickup('');
       setDestination('');
+      setPassengerLocation(null);
+      setDestinationLocation(null);
     } catch (error) {
       console.error("Failed to request ride", error);
     } finally {
@@ -506,19 +448,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
     } catch (e) { console.error(e); }
   };
 
-  const handleMapClick = async (e: MouseEvent) => {
+  const handleMapClick = async ({ lat, lng }: { lat: number; lng: number }) => {
     if (!isPickingOnMap) return;
-    
-    // Calculate simulated lat/lng based on click position in the container
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Map pixels back to coordinates relative to London center (51.5074, -0.1278)
-    // Scale is ~1000*5 pixels per degree from RiderDashboard mock
-    const lng = (x / 5000) - 0.1278;
-    const lat = (y / 5000) + 51.5074;
-
     const address = await reverseGeocode(lat, lng);
     
     if (isPickingOnMap === 'pickup') {
@@ -526,9 +457,40 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setPassengerLocation({ lat, lng });
     } else {
       setDestination(address);
+      setDestinationLocation({ lat, lng });
     }
     setIsPickingOnMap(null);
   };
+
+  const pickerCenter =
+    (isPickingOnMap === 'destination' ? destinationLocation : passengerLocation) ||
+    passengerLocation ||
+    destinationLocation ||
+    { lat: -1.9441, lng: 30.0619 };
+
+  const pickerMarkers = [
+    ...(passengerLocation ? [{
+      id: 'picker-pickup',
+      position: passengerLocation,
+      label: pickup || t('pickupLocation'),
+      type: 'passenger' as const
+    }] : []),
+    ...(destinationLocation ? [{
+      id: 'picker-destination',
+      position: destinationLocation,
+      label: destination || t('destinationAddress'),
+      type: 'destination' as const
+    }] : [])
+  ];
+  const pickerDirectionRequests =
+    passengerLocation && destinationLocation
+      ? [{
+          id: 'picker-route-preview',
+          origin: passengerLocation,
+          destination: destinationLocation,
+          color: '#2563eb'
+        }]
+      : [];
 
   if (completedRide) {
     return (
@@ -597,6 +559,50 @@ export default function PassengerDashboard({ user, profile }: Props) {
       nearbyDrivers.find((driver) => driver.uid === selectedNearbyRiderId && hasValidCoordinates(driver.currentLocation)) || null;
     const waitingForRiderStart = activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && !activeRide.riderConfirmedStart;
     const waitingForRiderEndSignal = activeRide.status === 'ongoing' && !activeRide.riderConfirmedEnd;
+    const rideDestination =
+      hasValidCoordinates(activeRide.destination)
+        ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng }
+        : null;
+    const activeRideDirectionRequests = [
+      ...(activeRide.status === 'requested' && ridePickupLocation && rideDestination
+        ? [{
+            id: `passenger-requested-trip-${activeRide.id}`,
+            origin: ridePickupLocation,
+            destination: rideDestination,
+            color: '#60a5fa'
+          }]
+        : []),
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
+      riderProfile?.currentLocation &&
+      ridePickupLocation
+        ? [{
+            id: `passenger-driver-to-pickup-${activeRide.id}`,
+            origin: riderProfile.currentLocation,
+            destination: ridePickupLocation,
+            color: '#10b981'
+          }]
+        : []),
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
+      ridePickupLocation &&
+      rideDestination
+        ? [{
+            id: `passenger-pickup-to-destination-${activeRide.id}`,
+            origin: ridePickupLocation,
+            destination: rideDestination,
+            color: '#60a5fa'
+          }]
+        : []),
+      ...(activeRide.status === 'ongoing' &&
+      riderProfile?.currentLocation &&
+      rideDestination
+        ? [{
+            id: `passenger-live-trip-${activeRide.id}`,
+            origin: riderProfile.currentLocation,
+            destination: rideDestination,
+            color: '#2563eb'
+          }]
+        : [])
+    ];
 
     return (
       <div className="space-y-6">
@@ -639,7 +645,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                     profile: driver
                   })) : [])
               ]}
-              routes={routes}
+              directionRequests={activeRideDirectionRequests}
               center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
               zoom={15}
               height="384px"
@@ -987,7 +993,10 @@ export default function PassengerDashboard({ user, profile }: Props) {
               type="text"
               placeholder={t('pickupLocation')}
               value={pickup}
-              onChange={(e) => setPickup(e.target.value)}
+              onChange={(e) => {
+                setPickup(e.target.value);
+                setPassengerLocation(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && pickup.trim()) {
                   // When user presses Enter, show map for picking
@@ -1020,7 +1029,10 @@ export default function PassengerDashboard({ user, profile }: Props) {
               type="text"
               placeholder={t('destinationAddress')}
               value={destination}
-              onChange={(e) => setDestination(e.target.value)}
+              onChange={(e) => {
+                setDestination(e.target.value);
+                setDestinationLocation(null);
+              }}
               className="w-full bg-gray-50 py-5 pl-12 pr-12 rounded-[1.5rem] border-none focus:ring-2 focus:ring-black transition-all outline-none"
             />
             <button 
@@ -1065,44 +1077,31 @@ export default function PassengerDashboard({ user, profile }: Props) {
           <motion.div 
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="bg-gray-900 rounded-[2rem] overflow-hidden relative cursor-crosshair border-4 border-black"
-            onClick={handleMapClick}
+            className="bg-gray-900 rounded-[2rem] overflow-hidden relative border-4 border-black"
           >
-            <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
-              <div className="space-y-4 mb-8">
-                <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
-                <div>
-                  <p className="font-bold uppercase tracking-widest text-[10px] text-white">Click on the map to set your {isPickingOnMap}</p>
-                  {isPickingOnMap === 'pickup' && pickup && (
-                    <p className="text-xs text-emerald-400 font-semibold mt-2">{pickup}</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex gap-4">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-200 border border-red-500/30 text-[8px] font-bold uppercase tracking-wider">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Live Traffic
-                </div>
-                {passengerLocation && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[8px] font-bold uppercase tracking-wider">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    Your Location
-                  </div>
-                )}
-              </div>
+            <div className="absolute left-4 right-16 top-4 z-10 rounded-2xl bg-black/75 px-4 py-3 text-white shadow-xl backdrop-blur">
+              <p className="font-bold uppercase tracking-widest text-[10px]">
+                Tap on Google Map to set your {isPickingOnMap}
+              </p>
+              {isPickingOnMap === 'pickup' && pickup && (
+                <p className="mt-2 text-xs font-semibold text-emerald-300">{pickup}</p>
+              )}
+              {isPickingOnMap === 'destination' && destination && (
+                <p className="mt-2 text-xs font-semibold text-emerald-300">{destination}</p>
+              )}
             </div>
-            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
-            
-            {passengerLocation && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2" style={{ marginLeft: -40 }}>
-                <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/50" />
-                <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest">You</span>
-              </div>
-            )}
+            <MapComponent
+              center={pickerCenter}
+              zoom={15}
+              markers={pickerMarkers}
+              directionRequests={pickerDirectionRequests}
+              onMapClick={handleMapClick}
+              height="320px"
+              showNearbyDrivers={false}
+            />
 
             <button 
-              onClick={(e) => { e.stopPropagation(); setIsPickingOnMap(null); }}
+              onClick={() => setIsPickingOnMap(null)}
               className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
             >
               <X className="w-4 h-4" />
@@ -1139,6 +1138,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       profile: rider
                     }))
                 ]}
+                directionRequests={
+                  passengerLocation && destinationLocation
+                    ? [{
+                        id: 'passenger-trip-preview',
+                        origin: passengerLocation,
+                        destination: destinationLocation,
+                        color: '#2563eb'
+                      }]
+                    : []
+                }
                 center={
                   onlineRiders.find((rider) => rider.uid === selectedNearbyRiderId && hasValidCoordinates(rider.currentLocation))?.currentLocation ||
                   passengerLocation ||

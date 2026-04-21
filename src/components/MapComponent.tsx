@@ -18,13 +18,23 @@ interface MapRoute {
   label?: string;
 }
 
+interface MapDirectionsRequest {
+  id: string;
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  waypoints?: { lat: number; lng: number }[];
+  color?: string;
+}
+
 interface MapComponentProps {
   center?: { lat: number; lng: number };
   zoom?: number;
   markers: MapMarker[];
   routes?: MapRoute[];
+  directionRequests?: MapDirectionsRequest[];
   showNearbyDrivers?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
+  onMapClick?: (position: { lat: number; lng: number }) => void;
   height?: string;
   showMapTypeControl?: boolean;
 }
@@ -45,15 +55,23 @@ export default function MapComponent({
   zoom = 14,
   markers = [],
   routes = [],
+  directionRequests = [],
   showNearbyDrivers = true,
   onMarkerClick,
+  onMapClick,
   height = '400px',
   showMapTypeControl = true
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [generatedRoutes, setGeneratedRoutes] = useState<MapRoute[]>([]);
   const advancedMarkersRef = useRef<AdvancedMarkerInstance[]>([]);
+  const directionsKey = JSON.stringify(directionRequests);
+  const markersKey = JSON.stringify(markers.map((marker) => ({
+    id: marker.id,
+    position: marker.position
+  })));
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'ntwara-google-maps-script',
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
@@ -142,6 +160,115 @@ export default function MapComponent({
     };
   }, [isLoaded, map, markers, onMarkerClick]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isLoaded || !window.google?.maps?.DirectionsService) {
+      setGeneratedRoutes([]);
+      return;
+    }
+
+    const validRequests = directionRequests.filter((request) =>
+      Number.isFinite(request.origin.lat) &&
+      Number.isFinite(request.origin.lng) &&
+      Number.isFinite(request.destination.lat) &&
+      Number.isFinite(request.destination.lng)
+    );
+
+    if (validRequests.length === 0) {
+      setGeneratedRoutes([]);
+      return;
+    }
+
+    const directionsService = new window.google.maps.DirectionsService();
+
+    Promise.all(
+      validRequests.map(async (request) => {
+        const result = await directionsService.route({
+          origin: request.origin,
+          destination: request.destination,
+          waypoints: request.waypoints?.map((point) => ({
+            location: point,
+            stopover: true
+          })),
+          travelMode: window.google.maps.TravelMode.DRIVING
+        });
+
+        const overviewPath = result.routes[0]?.overview_path ?? [];
+
+        return {
+          id: request.id,
+          color: request.color,
+          points: overviewPath.map((point) => ({
+            lat: point.lat(),
+            lng: point.lng()
+          }))
+        } as MapRoute;
+      })
+    )
+      .then((nextRoutes) => {
+        if (!cancelled) {
+          setGeneratedRoutes(nextRoutes.filter((route) => route.points.length > 0));
+        }
+      })
+      .catch((error) => {
+        console.error('Error generating map directions:', error);
+        if (!cancelled) {
+          setGeneratedRoutes([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, directionsKey]);
+
+  const displayedRoutes = [...routes, ...generatedRoutes];
+  const displayedRoutesKey = JSON.stringify(
+    displayedRoutes.map((route) => ({
+      id: route.id,
+      color: route.color,
+      points: route.points
+    }))
+  );
+
+  useEffect(() => {
+    if (!map || !window.google?.maps) {
+      return;
+    }
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasBounds = false;
+
+    markers.forEach((marker) => {
+      bounds.extend(marker.position);
+      hasBounds = true;
+    });
+
+    displayedRoutes.forEach((route) => {
+      route.points.forEach((point) => {
+        bounds.extend(point);
+        hasBounds = true;
+      });
+    });
+
+    if (!hasBounds) {
+      map.setCenter(center);
+      map.setZoom(zoom);
+      return;
+    }
+
+    const shouldFitBounds =
+      markers.length + displayedRoutes.reduce((count, route) => count + route.points.length, 0) > 1;
+
+    if (shouldFitBounds) {
+      map.fitBounds(bounds, 64);
+    } else {
+      map.setCenter(center);
+      map.setZoom(zoom);
+    }
+  }, [map, center, zoom, markersKey, displayedRoutesKey]);
+
   if (loadError) {
     return (
       <div
@@ -207,6 +334,13 @@ export default function MapComponent({
       <GoogleMap
         onLoad={(mapInstance) => setMap(mapInstance)}
         onUnmount={() => setMap(null)}
+        onClick={(event) => {
+          if (!event.latLng || !onMapClick) return;
+          onMapClick({
+            lat: event.latLng.lat(),
+            lng: event.latLng.lng()
+          });
+        }}
         mapContainerStyle={{
           width: '100%',
           height: '100%',
@@ -249,7 +383,7 @@ export default function MapComponent({
       )}
 
       {/* Routes/Polylines */}
-      {routes.map((route) => (
+      {displayedRoutes.map((route) => (
         <PolylineF
           key={route.id}
           path={route.points}
