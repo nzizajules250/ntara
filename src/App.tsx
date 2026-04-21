@@ -6,12 +6,13 @@
 import { useState, useEffect } from 'react';
 import { auth, getUserProfile, UserProfile, subscribeToUserProfile } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X } from 'lucide-react';
+import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PassengerDashboard from './components/PassengerDashboard';
 import RiderDashboard from './components/RiderDashboard';
 import RideHistory from './components/RideHistory';
 import ProfileView from './components/ProfileView';
+import HowItWorks from './components/HowItWorks';
 import Auth from './components/Auth';
 import { NotificationProvider } from './components/NotificationCenter';
 import { LanguageProvider, useLanguage } from './lib/i18n';
@@ -22,7 +23,7 @@ function AppContent() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'dashboard' | 'history' | 'profile'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'history' | 'profile' | 'how-it-works'>('dashboard');
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark';
@@ -207,7 +208,7 @@ function AppContent() {
           </div>
         </nav>
 
-        <div className="hidden lg:block max-w-3xl mx-auto px-6 pt-5">
+        <div className="hidden lg:block max-w-4xl mx-auto px-6 pt-5">
           <div className="flex items-center justify-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-xl shadow-black/10 backdrop-blur-xl">
             <button 
               onClick={() => setView('dashboard')}
@@ -224,6 +225,13 @@ function AppContent() {
               <span>{t('history')}</span>
             </button>
             <button 
+              onClick={() => setView('how-it-works')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'how-it-works' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <HelpCircle className="w-5 h-5" />
+              <span>{t('guide')}</span>
+            </button>
+            <button 
               onClick={() => setView('profile')}
               className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'profile' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
             >
@@ -237,7 +245,7 @@ function AppContent() {
           </div>
         </div>
 
-        <main className="max-w-3xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pt-5 lg:pb-10">
+        <main className="max-w-4xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pt-5 lg:pb-10">
           <AnimatePresence mode="wait">
             {view === 'dashboard' ? (
               <motion.div
@@ -260,6 +268,15 @@ function AppContent() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <RideHistory user={user} profile={profile} />
+              </motion.div>
+            ) : view === 'how-it-works' ? (
+              <motion.div
+                key="how-it-works"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+              >
+                <HowItWorks profile={profile} />
               </motion.div>
             ) : (
               <motion.div
@@ -290,6 +307,13 @@ function AppContent() {
             >
               <History className="w-6 h-6" />
               <span className="text-[10px] font-bold mt-1">{t('history')}</span>
+            </button>
+            <button 
+              onClick={() => setView('how-it-works')}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'how-it-works' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <HelpCircle className="w-6 h-6" />
+              <span className="text-[10px] font-bold mt-1">{t('guide')}</span>
             </button>
             <button 
               onClick={() => setView('profile')}
