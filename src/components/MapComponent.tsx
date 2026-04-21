@@ -1,5 +1,5 @@
-import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF, MarkerF } from '@react-google-maps/api';
-import { useState } from 'react';
+import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF } from '@react-google-maps/api';
+import { useEffect, useRef, useState } from 'react';
 import { UserProfile } from '../lib/firebase';
 import { Satellite, Map as MapIcon } from 'lucide-react';
 
@@ -30,8 +30,15 @@ interface MapComponentProps {
 }
 
 const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
+const GOOGLE_MAPS_MAP_ID = (import.meta as any).env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
+const MAP_LIBRARIES: ('marker')[] = ['marker'];
 
 const defaultCenter = { lat: 51.5074, lng: -0.1278 }; // London
+
+type AdvancedMarkerInstance = {
+  marker: google.maps.marker.AdvancedMarkerElement;
+  listener: google.maps.MapsEventListener;
+};
 
 export default function MapComponent({
   center = defaultCenter,
@@ -45,23 +52,42 @@ export default function MapComponent({
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const advancedMarkersRef = useRef<AdvancedMarkerInstance[]>([]);
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'ntwara-google-maps-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: MAP_LIBRARIES,
+    mapIds: [GOOGLE_MAPS_MAP_ID]
   });
 
   const getMarkerColor = (type: string) => {
     switch (type) {
       case 'passenger':
-        return 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png';
+        return '#2563eb';
       case 'rider':
-        return 'http://maps.google.com/mapfiles/ms/icons/green-dot.png';
+        return '#16a34a';
       case 'nearby':
-        return 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png';
+        return '#eab308';
       case 'destination':
-        return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+        return '#dc2626';
       default:
-        return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+        return '#dc2626';
+    }
+  };
+
+  const getMarkerGlyph = (type: MapMarker['type']) => {
+    switch (type) {
+      case 'passenger':
+        return 'P';
+      case 'rider':
+        return 'R';
+      case 'nearby':
+        return 'N';
+      case 'destination':
+        return 'D';
+      default:
+        return '';
     }
   };
 
@@ -69,6 +95,52 @@ export default function MapComponent({
     setSelectedMarker(marker);
     onMarkerClick?.(marker);
   };
+
+  useEffect(() => {
+    advancedMarkersRef.current.forEach(({ marker, listener }) => {
+      listener.remove();
+      marker.map = null;
+    });
+    advancedMarkersRef.current = [];
+
+    if (!isLoaded || !map || !window.google?.maps?.marker?.AdvancedMarkerElement || !window.google?.maps?.marker?.PinElement) {
+      return;
+    }
+
+    const { AdvancedMarkerElement, PinElement } = window.google.maps.marker;
+
+    advancedMarkersRef.current = markers.map((markerData) => {
+      const pin = new PinElement({
+        background: getMarkerColor(markerData.type),
+        borderColor: '#111827',
+        glyphColor: '#ffffff',
+        glyph: getMarkerGlyph(markerData.type),
+        scale: markerData.type === 'destination' ? 1.1 : 1
+      });
+
+      const advancedMarker = new AdvancedMarkerElement({
+        map,
+        position: markerData.position,
+        title: markerData.label,
+        content: pin
+      });
+
+      const listener = advancedMarker.addListener('click', () => handleMarkerClick(markerData));
+
+      return {
+        marker: advancedMarker,
+        listener
+      };
+    });
+
+    return () => {
+      advancedMarkersRef.current.forEach(({ marker, listener }) => {
+        listener.remove();
+        marker.map = null;
+      });
+      advancedMarkersRef.current = [];
+    };
+  }, [isLoaded, map, markers, onMarkerClick]);
 
   if (loadError) {
     return (
@@ -133,6 +205,8 @@ export default function MapComponent({
         </div>
       )}
       <GoogleMap
+        onLoad={(mapInstance) => setMap(mapInstance)}
+        onUnmount={() => setMap(null)}
         mapContainerStyle={{
           width: '100%',
           height: '100%',
@@ -142,6 +216,7 @@ export default function MapComponent({
         zoom={zoom}
         mapTypeId={mapType}
         options={{
+          mapId: GOOGLE_MAPS_MAP_ID,
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
@@ -185,19 +260,6 @@ export default function MapComponent({
             geodesic: true,
             clickable: false
           }}
-        />
-      ))}
-
-      {markers.map((marker) => (
-        <MarkerF
-          key={marker.id}
-          position={marker.position}
-          title={marker.label}
-          icon={{
-            url: getMarkerColor(marker.type),
-            scaledSize: new window.google.maps.Size(32, 32)
-          }}
-          onClick={() => handleMarkerClick(marker)}
         />
       ))}
 

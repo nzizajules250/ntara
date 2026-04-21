@@ -25,7 +25,7 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [availableRides, setAvailableRides] = useState<Ride[]>([]);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [passengerProfile, setPassengerProfile] = useState<UserProfile | null>(null);
-  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>([]);
+  const [routes, setRoutes] = useState<Array<{ id: string; points: { lat: number; lng: number }[]; color?: string }>>([]);
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(profile.currentLocation || null);
   const [isPickingOnMap, setIsPickingOnMap] = useState<boolean>(false);
   const prevRidesCount = useRef(0);
