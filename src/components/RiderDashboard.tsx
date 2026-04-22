@@ -19,6 +19,27 @@ const hasValidCoordinates = (point?: { lat: number; lng: number } | null) =>
   Number.isFinite(point.lng) &&
   (point.lat !== 0 || point.lng !== 0);
 
+const MANUAL_LOCATION_RELEASE_DISTANCE_METERS = 35;
+
+const getDistanceInMeters = (
+  start: { lat: number; lng: number },
+  end: { lat: number; lng: number }
+) => {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const dLat = toRadians(end.lat - start.lat);
+  const dLng = toRadians(end.lng - start.lng);
+  const startLat = toRadians(start.lat);
+  const endLat = toRadians(end.lat);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(startLat) * Math.cos(endLat) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 export default function RiderDashboard({ user, profile }: Props) {
   const { t } = useLanguage();
   const { addNotification } = useNotifications();
@@ -32,6 +53,11 @@ export default function RiderDashboard({ user, profile }: Props) {
   const lastStatusRef = useRef<string | null>(null);
   // Track which rides have had their end confirmation notification sent
   const endConfirmationSentRef = useRef<Set<string>>(new Set());
+  const effectiveRiderLocation = riderLocation || profile.currentLocation || null;
+  const manualLocationAnchor =
+    profile.locationTrackingMode === 'manual' && hasValidCoordinates(profile.manualLocationAnchor)
+      ? profile.manualLocationAnchor
+      : null;
 
   // Badge logic
   const possibleBadges = [
@@ -46,12 +72,18 @@ export default function RiderDashboard({ user, profile }: Props) {
     try {
       await reverseGeocode(lat, lng);
       setRiderLocation({ lat, lng });
-      await updateUserLocation(user.uid, lat, lng);
+      await updateUserLocation(user.uid, lat, lng, { source: 'manual' });
     } catch (error) {
       console.error('Error updating location:', error);
     }
     setIsPickingOnMap(false);
   };
+
+  useEffect(() => {
+    if (hasValidCoordinates(profile.currentLocation)) {
+      setRiderLocation(profile.currentLocation);
+    }
+  }, [profile.currentLocation?.lat, profile.currentLocation?.lng]);
 
   useEffect(() => {
     const earnedBadgeIds = possibleBadges.filter(b => b.earned).map(b => b.id);
@@ -82,10 +114,10 @@ export default function RiderDashboard({ user, profile }: Props) {
       }
       
       // Filter by radius if set and rider has a location
-      if (profile.availabilityRadius && profile.currentLocation) {
+      if (profile.availabilityRadius && effectiveRiderLocation) {
         filtered = filtered.filter(ride => {
-          const latDiff = Math.abs(ride.pickup.lat - profile.currentLocation!.lat);
-          const lngDiff = Math.abs(ride.pickup.lng - profile.currentLocation!.lng);
+          const latDiff = Math.abs(ride.pickup.lat - effectiveRiderLocation.lat);
+          const lngDiff = Math.abs(ride.pickup.lng - effectiveRiderLocation.lng);
           const distance = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lngDiff, 2));
           // roughly distance * 111 for km. So distance * 111 <= radius.
           return (distance * 111) <= profile.availabilityRadius!;
@@ -155,7 +187,7 @@ export default function RiderDashboard({ user, profile }: Props) {
       subAvailable();
       subMyRides();
     };
-  }, [user.uid, addNotification, profile.availabilityRadius, profile.currentLocation]);
+  }, [user.uid, addNotification, profile.availabilityRadius, effectiveRiderLocation?.lat, effectiveRiderLocation?.lng, profile.vehicleType]);
 
   // Update driver status based on active ride
   useEffect(() => {
@@ -176,7 +208,18 @@ export default function RiderDashboard({ user, profile }: Props) {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        updateUserLocation(user.uid, latitude, longitude).catch(console.error);
+        const liveLocation = { lat: latitude, lng: longitude };
+
+        if (manualLocationAnchor) {
+          const distanceFromPinnedLocation = getDistanceInMeters(manualLocationAnchor, liveLocation);
+
+          if (distanceFromPinnedLocation < MANUAL_LOCATION_RELEASE_DISTANCE_METERS) {
+            return;
+          }
+        }
+
+        setRiderLocation(liveLocation);
+        updateUserLocation(user.uid, latitude, longitude, { source: 'live' }).catch(console.error);
       },
       (error) => {
         console.error("Error tracking location:", error);
@@ -189,7 +232,7 @@ export default function RiderDashboard({ user, profile }: Props) {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [user.uid]);
+  }, [user.uid, manualLocationAnchor?.lat, manualLocationAnchor?.lng]);
 
   useEffect(() => {
     if (activeRide?.passengerId) {
@@ -288,9 +331,9 @@ export default function RiderDashboard({ user, profile }: Props) {
         ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng }
         : null;
     const rideMapMarkers = [
-      ...(hasValidCoordinates(profile.currentLocation) ? [{
+      ...(hasValidCoordinates(effectiveRiderLocation) ? [{
         id: 'rider-live',
-        position: profile.currentLocation!,
+        position: effectiveRiderLocation!,
         label: profile.name,
         type: 'rider' as const,
         profile
@@ -310,11 +353,11 @@ export default function RiderDashboard({ user, profile }: Props) {
     ];
     const activeRideDirectionRequests = [
       ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
-      hasValidCoordinates(profile.currentLocation) &&
+      hasValidCoordinates(effectiveRiderLocation) &&
       ridePickupLocation
         ? [{
             id: `rider-driver-to-pickup-${activeRide.id}`,
-            origin: profile.currentLocation!,
+            origin: effectiveRiderLocation!,
             destination: ridePickupLocation,
             color: '#10b981'
           }]
@@ -330,11 +373,11 @@ export default function RiderDashboard({ user, profile }: Props) {
           }]
         : []),
       ...(activeRide.status === 'ongoing' &&
-      hasValidCoordinates(profile.currentLocation) &&
+      hasValidCoordinates(effectiveRiderLocation) &&
       rideDestination
         ? [{
             id: `rider-live-trip-${activeRide.id}`,
-            origin: profile.currentLocation!,
+            origin: effectiveRiderLocation!,
             destination: rideDestination,
             color: '#2563eb'
           }]
@@ -342,7 +385,7 @@ export default function RiderDashboard({ user, profile }: Props) {
     ];
 
     const rideMapCenter =
-      profile.currentLocation ||
+      effectiveRiderLocation ||
       (activeRide.status === 'ongoing' && hasValidCoordinates(activeRide.destination)
         ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng }
         : hasValidCoordinates(activeRide.pickup)
@@ -503,9 +546,9 @@ export default function RiderDashboard({ user, profile }: Props) {
       ? { lat: previewRide.destination.lat, lng: previewRide.destination.lng }
       : null;
   const previewMapMarkers = [
-    ...(profile.currentLocation && hasValidCoordinates(profile.currentLocation) ? [{
+    ...(effectiveRiderLocation && hasValidCoordinates(effectiveRiderLocation) ? [{
       id: 'driver-live',
-      position: profile.currentLocation,
+      position: effectiveRiderLocation,
       label: profile.name,
       type: 'rider' as const,
       profile
@@ -524,10 +567,10 @@ export default function RiderDashboard({ user, profile }: Props) {
     }] : [])
   ];
   const previewDirectionRequests = [
-    ...(profile.currentLocation && hasValidCoordinates(profile.currentLocation) && previewPickupLocation
+    ...(effectiveRiderLocation && hasValidCoordinates(effectiveRiderLocation) && previewPickupLocation
       ? [{
           id: `preview-driver-to-pickup-${previewRide?.id || 'route'}`,
-          origin: profile.currentLocation,
+          origin: effectiveRiderLocation,
           destination: previewPickupLocation,
           color: '#10b981'
         }]
@@ -541,12 +584,12 @@ export default function RiderDashboard({ user, profile }: Props) {
         }]
       : [])
   ];
-  const riderPickerCenter = riderLocation || profile.currentLocation || { lat: -1.9441, lng: 30.0619 };
+  const riderPickerCenter = effectiveRiderLocation || { lat: -1.9441, lng: 30.0619 };
   const riderPickerMarkers = [
-    ...((riderLocation || profile.currentLocation)
+    ...(effectiveRiderLocation
       ? [{
           id: 'rider-picker-location',
-          position: riderLocation || profile.currentLocation!,
+          position: effectiveRiderLocation,
           label: profile.name,
           type: 'rider' as const,
           profile
@@ -630,7 +673,7 @@ export default function RiderDashboard({ user, profile }: Props) {
       </motion.div>
 
       {/* Driver Map View - Show when waiting for rides */}
-      {!activeRide && profile.currentLocation && hasValidCoordinates(profile.currentLocation) && (
+      {!activeRide && effectiveRiderLocation && hasValidCoordinates(effectiveRiderLocation) && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -640,7 +683,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             <MapComponent
               markers={previewMapMarkers}
               directionRequests={previewDirectionRequests}
-              center={previewPickupLocation || profile.currentLocation}
+              center={previewPickupLocation || effectiveRiderLocation}
               zoom={14}
               showNearbyDrivers={false}
               height="250px"

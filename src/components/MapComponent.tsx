@@ -48,7 +48,7 @@ const MAP_LIBRARIES: ('marker')[] = ['marker'];
 const defaultCenter = { lat: 51.5074, lng: -0.1278 }; // London
 
 type AdvancedMarkerInstance = {
-  marker: google.maps.marker.AdvancedMarkerElement;
+  marker: google.maps.marker.AdvancedMarkerElement;t
   listener: google.maps.MapsEventListener;
 };
 

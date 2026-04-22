@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, onSnapshot, serverTimestamp, orderBy, limit, getDocs, arrayUnion, arrayRemove, increment, deleteField } from 'firebase/firestore';
 export { doc, updateDoc };
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -86,6 +86,9 @@ export interface UserProfile {
   status?: 'active' | 'inactive' | 'riding';
   badges?: string[];
   currentLocation?: { lat: number; lng: number };
+  manualLocationAnchor?: { lat: number; lng: number };
+  locationTrackingMode?: 'manual' | 'live';
+  manualLocationSetAt?: any;
   gender?: string;
   dob?: string;
   vehicleType?: 'car' | 'motorcycle';
@@ -242,12 +245,29 @@ export async function validatePromoCode(code: string): Promise<PromoCode | null>
   }
 }
 
-export async function updateUserLocation(uid: string, lat: number, lng: number): Promise<void> {
+export async function updateUserLocation(
+  uid: string,
+  lat: number,
+  lng: number,
+  options?: { source?: 'manual' | 'live'; preserveManualLocation?: boolean }
+): Promise<void> {
   try {
-    await updateDoc(doc(db, 'users', uid), {
+    const updateData: Record<string, any> = {
       currentLocation: { lat, lng },
       updatedAt: serverTimestamp()
-    });
+    };
+
+    if (options?.source === 'manual') {
+      updateData.locationTrackingMode = 'manual';
+      updateData.manualLocationAnchor = { lat, lng };
+      updateData.manualLocationSetAt = serverTimestamp();
+    } else if (!options?.preserveManualLocation) {
+      updateData.locationTrackingMode = 'live';
+      updateData.manualLocationAnchor = deleteField();
+      updateData.manualLocationSetAt = deleteField();
+    }
+
+    await updateDoc(doc(db, 'users', uid), updateData);
   } catch (error) {
     return handleFirestoreError(error, 'update', `users/${uid}`);
   }
