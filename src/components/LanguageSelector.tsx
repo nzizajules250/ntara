@@ -25,7 +25,7 @@ export default function LanguageSelector() {
             <img
               src="/ntwara-logo.png"
               alt="Ntwara"
-              className="h-14 w-14 object-contain"
+              className="h-20 w-20 object-contain"
             />
           </div>
           <div>
