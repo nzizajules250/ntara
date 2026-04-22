@@ -17,6 +17,7 @@ import Auth from './components/Auth';
 import { NotificationProvider } from './components/NotificationCenter';
 import { LanguageProvider, useLanguage } from './lib/i18n';
 import LanguageSelector from './components/LanguageSelector';
+import WelcomeScreen from './components/WelcomeScreen';
 
 function AppContent() {
   const { language, t } = useLanguage();
@@ -32,6 +33,14 @@ function AppContent() {
   });
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const savedLanguage = localStorage.getItem('language');
+    return savedLanguage ? localStorage.getItem(`welcome_seen_${savedLanguage}`) !== 'true' : false;
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -101,8 +110,28 @@ function AppContent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!language) {
+      setShowWelcome(false);
+      return;
+    }
+
+    setShowWelcome(localStorage.getItem(`welcome_seen_${language}`) !== 'true');
+  }, [language]);
+
+  const handleWelcomeContinue = () => {
+    if (language) {
+      localStorage.setItem(`welcome_seen_${language}`, 'true');
+    }
+    setShowWelcome(false);
+  };
+
   if (!language) {
     return <LanguageSelector />;
+  }
+
+  if (showWelcome) {
+    return <WelcomeScreen onContinue={handleWelcomeContinue} />;
   }
 
   if (loading) {
