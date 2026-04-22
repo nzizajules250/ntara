@@ -61,11 +61,11 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
             </div>
 
             <div className="max-w-2xl space-y-5">
-              <div className="flex h-18 w-18 items-center justify-center rounded-[1.6rem] bg-white shadow-lg shadow-cyan-500/10">
+              <div className="flex h-18 w-18 items-center justify-center rounded-[1.6rem] bg-black shadow-lg shadow-cyan-500/10">
                 <img
                   src="/ntwara-logo.png"
                   alt="Ntwara"
-                  className="h-11 w-11 object-contain"
+                  className="h-40 w-40 object-contain"
                 />
               </div>
 
