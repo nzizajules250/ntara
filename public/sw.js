@@ -78,7 +78,7 @@ self.addEventListener('push', (event) => {
     notificationData = event.data.json();
   } catch (e) {
     notificationData = {
-      title: event.data.text() || 'SwiftRide Notification',
+      title: event.data.text() || 'Ntwara Notification',
       body: 'You have a new message'
     };
   }
@@ -94,7 +94,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(notificationData.title || 'SwiftRide', options)
+    self.registration.showNotification(notificationData.title || 'Ntwara Notification', options)
   );
 });
 
