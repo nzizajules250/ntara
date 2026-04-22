@@ -400,6 +400,7 @@ export default function RiderDashboard({ user, profile }: Props) {
                 showNearbyDrivers={false}
                 height="240px"
                 directionRequests={activeRideDirectionRequests}
+                freezeViewport={true}
               />
             </div>
           ) : (
@@ -632,26 +633,24 @@ export default function RiderDashboard({ user, profile }: Props) {
         >
           <div className="p-3 sm:p-4">
             <MapComponent
-              markers={[
-                {
-                  id: 'driver-live',
-                  position: profile.currentLocation,
-                  label: profile.name,
-                  type: 'rider' as const,
-                  profile
-                }
-              ]}
-              center={profile.currentLocation}
+              markers={previewMapMarkers}
+              directionRequests={previewDirectionRequests}
+              center={previewPickupLocation || profile.currentLocation}
               zoom={14}
               showNearbyDrivers={false}
               height="250px"
+              autoFit={!!previewRide}
             />
           </div>
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 text-sm text-white/80">
             <div className="flex justify-between items-center">
               <div>
-                <p className="font-semibold">Waiting for ride requests...</p>
-                <p className="text-xs text-white/50">Your location is visible to nearby passengers</p>
+                <p className="font-semibold">
+                  {previewRide ? 'Previewing a live request route' : 'Waiting for ride requests...'}
+                </p>
+                <p className="text-xs text-white/50">
+                  {previewRide ? `${previewRide.pickup.address} to ${previewRide.destination.address}` : 'Your location is visible to nearby passengers'}
+                </p>
               </div>
               <button
                 onClick={() => setIsPickingOnMap(!isPickingOnMap)}
@@ -738,7 +737,13 @@ export default function RiderDashboard({ user, profile }: Props) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group"
+                onClick={() => setSelectedRidePreviewId(ride.id)}
+                onMouseEnter={() => setSelectedRidePreviewId(ride.id)}
+                className={`bg-white p-6 rounded-3xl border shadow-sm transition-all group cursor-pointer ${
+                  selectedRidePreviewId === ride.id
+                    ? 'border-black ring-2 ring-black/10'
+                    : 'border-gray-100 hover:border-black hover:shadow-md'
+                }`}
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex items-center gap-3">

@@ -32,6 +32,8 @@ interface MapComponentProps {
   markers: MapMarker[];
   routes?: MapRoute[];
   directionRequests?: MapDirectionsRequest[];
+  autoFit?: boolean;
+  freezeViewport?: boolean;
   showNearbyDrivers?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
   onMapClick?: (position: { lat: number; lng: number }) => void;
@@ -56,6 +58,8 @@ export default function MapComponent({
   markers = [],
   routes = [],
   directionRequests = [],
+  autoFit = false,
+  freezeViewport = false,
   showNearbyDrivers = true,
   onMarkerClick,
   onMapClick,
@@ -65,9 +69,12 @@ export default function MapComponent({
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [cameraCenter, setCameraCenter] = useState(center);
+  const [cameraZoom, setCameraZoom] = useState(zoom);
   const [generatedRoutes, setGeneratedRoutes] = useState<MapRoute[]>([]);
   const advancedMarkersRef = useRef<AdvancedMarkerInstance[]>([]);
   const directionsKey = JSON.stringify(directionRequests);
+  const centerKey = JSON.stringify(center);
   const markersKey = JSON.stringify(markers.map((marker) => ({
     id: marker.id,
     position: marker.position
@@ -113,6 +120,18 @@ export default function MapComponent({
     setSelectedMarker(marker);
     onMarkerClick?.(marker);
   };
+
+  useEffect(() => {
+    if (!freezeViewport) {
+      setCameraCenter(center);
+    }
+  }, [freezeViewport, centerKey]);
+
+  useEffect(() => {
+    if (!freezeViewport) {
+      setCameraZoom(zoom);
+    }
+  }, [freezeViewport, zoom]);
 
   useEffect(() => {
     advancedMarkersRef.current.forEach(({ marker, listener }) => {
@@ -233,7 +252,7 @@ export default function MapComponent({
   );
 
   useEffect(() => {
-    if (!map || !window.google?.maps) {
+    if (!autoFit || !map || !window.google?.maps) {
       return;
     }
 
@@ -253,8 +272,6 @@ export default function MapComponent({
     });
 
     if (!hasBounds) {
-      map.setCenter(center);
-      map.setZoom(zoom);
       return;
     }
 
@@ -263,11 +280,8 @@ export default function MapComponent({
 
     if (shouldFitBounds) {
       map.fitBounds(bounds, 64);
-    } else {
-      map.setCenter(center);
-      map.setZoom(zoom);
     }
-  }, [map, center, zoom, markersKey, displayedRoutesKey]);
+  }, [autoFit, map, markersKey, displayedRoutesKey]);
 
   if (loadError) {
     return (
@@ -346,8 +360,8 @@ export default function MapComponent({
           height: '100%',
           borderRadius: '1.5rem'
         }}
-        center={center}
-        zoom={zoom}
+        center={cameraCenter}
+        zoom={cameraZoom}
         mapTypeId={mapType}
         options={{
           mapId: GOOGLE_MAPS_MAP_ID,
