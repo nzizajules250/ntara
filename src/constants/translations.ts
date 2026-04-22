@@ -2,7 +2,7 @@ export type Language = 'en' | 'fr' | 'rw';
 
 export const translations = {
   en: {
-    welcome: 'Welcome to SwiftRide',
+    welcome: 'Welcome to Ntwara',
     selectLanguage: 'Choose your language',
     continue: 'Continue',
     whereTo: 'Where to Go?',
@@ -302,7 +302,7 @@ export const translations = {
     communicationTip: 'Quick responses to passengers lead to better ratings and tips.',
   },
   fr: {
-    welcome: 'Bienvenue sur SwiftRide',
+    welcome: 'Bienvenue sur Ntwara',
     selectLanguage: 'Choisissez votre langue',
     continue: 'Continuer',
     whereTo: 'Où allez-vous ?',
@@ -602,7 +602,7 @@ export const translations = {
     communicationTip: 'Les réponses rapides aux passagers mènent à de meilleures évaluations et à des pourboires.',
   },
   rw: {
-    welcome: 'Ikaze kuri SwiftRide',
+    welcome: 'Ikaze kuri Ntwara',
     selectLanguage: 'Hitamo ururimi',
     continue: 'Komeza',
     whereTo: 'Urerekeza he?',
