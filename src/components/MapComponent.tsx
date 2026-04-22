@@ -41,7 +41,7 @@ interface MapComponentProps {
   showMapTypeControl?: boolean;
 }
 
-const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyD7nQp1Ei20IEcsXMFjQKq0ASi8N7ZWcEQ';
+const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyA0x1maORlZEkKWdFgxDBuDukI4mOMDlb0';
 const GOOGLE_MAPS_MAP_ID = (import.meta as any).env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 const MAP_LIBRARIES: ('marker')[] = ['marker'];
 
@@ -159,7 +159,7 @@ export default function MapComponent({
         map,
         position: markerData.position,
         title: markerData.label,
-        content: pin
+        content: pin.element
       });
 
       const listener = advancedMarker.addListener('click', () => handleMarkerClick(markerData));

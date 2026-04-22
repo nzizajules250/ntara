@@ -40,18 +40,11 @@ export default function RiderDashboard({ user, profile }: Props) {
     { id: 'Elite Status', earned: profile.rating >= 4.9 }
   ];
 
-  const handleMapClick = async (e: MouseEvent) => {
+  const handleMapClick = async ({ lat, lng }: { lat: number; lng: number }) => {
     if (!isPickingOnMap) return;
-    
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const lng = (x / 5000) - 0.1278;
-    const lat = (y / 5000) + 51.5074;
 
     try {
-      const address = await reverseGeocode(lat, lng);
+      await reverseGeocode(lat, lng);
       setRiderLocation({ lat, lng });
       await updateUserLocation(user.uid, lat, lng);
     } catch (error) {
@@ -548,6 +541,18 @@ export default function RiderDashboard({ user, profile }: Props) {
         }]
       : [])
   ];
+  const riderPickerCenter = riderLocation || profile.currentLocation || { lat: -1.9441, lng: 30.0619 };
+  const riderPickerMarkers = [
+    ...((riderLocation || profile.currentLocation)
+      ? [{
+          id: 'rider-picker-location',
+          position: riderLocation || profile.currentLocation!,
+          label: profile.name,
+          type: 'rider' as const,
+          profile
+        }]
+      : [])
+  ];
 
   return (
     <div className="space-y-8">
@@ -668,41 +673,29 @@ export default function RiderDashboard({ user, profile }: Props) {
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="bg-gray-900 rounded-[2rem] overflow-hidden relative cursor-crosshair border-4 border-black"
-          onClick={handleMapClick}
+          className="bg-gray-900 rounded-[2rem] overflow-hidden relative border-4 border-black"
         >
-          <div className="h-64 flex flex-col items-center justify-center p-8 text-center text-white/40">
-            <div className="space-y-4 mb-8">
-              <MapPin className="w-12 h-12 mx-auto animate-bounce text-emerald-400" />
-              <div>
-                <p className="font-bold uppercase tracking-widest text-[10px] text-white">Click on the map to set your location</p>
-              </div>
-            </div>
-            
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/20 text-red-200 border border-red-500/30 text-[8px] font-bold uppercase tracking-wider">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                Live Traffic
-              </div>
-              {riderLocation && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-500/30 text-[8px] font-bold uppercase tracking-wider">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  Your Location
-                </div>
-              )}
-            </div>
+          <div className="absolute left-4 right-16 top-4 z-10 rounded-2xl bg-black/75 px-4 py-3 text-white shadow-xl backdrop-blur">
+            <p className="font-bold uppercase tracking-widest text-[10px]">
+              Tap on Google Map to set your location
+            </p>
+            {riderLocation && (
+              <p className="mt-2 text-xs font-semibold text-emerald-300">
+                {riderLocation.lat.toFixed(5)}, {riderLocation.lng.toFixed(5)}
+              </p>
+            )}
           </div>
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px), repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.05) 40px)' }} />
-          
-          {riderLocation && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2" style={{ marginLeft: -40 }}>
-              <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/50" />
-              <span className="text-[8px] text-white/60 font-bold uppercase tracking-widest">You</span>
-            </div>
-          )}
+          <MapComponent
+            center={riderPickerCenter}
+            zoom={15}
+            markers={riderPickerMarkers}
+            onMapClick={handleMapClick}
+            height="320px"
+            showNearbyDrivers={false}
+          />
 
           <button 
-            onClick={(e) => { e.stopPropagation(); setIsPickingOnMap(false); }}
+            onClick={() => setIsPickingOnMap(false)}
             className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
           >
             <X className="w-4 h-4" />
