@@ -358,7 +358,7 @@ const HowItWorks = ({ profile }: Props) => {
   const userTips = isPassengerGuide ? tips.passenger : tips.rider;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-950 dark:to-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <motion.div
@@ -367,7 +367,7 @@ const HowItWorks = ({ profile }: Props) => {
           className="text-center mb-12"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Accessibility className="w-8 h-8 text-emerald-500" />
+            <Accessibility className="w-8 h-8 text-orange-500" />
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white">
               {isPassengerGuide ? t('howToRequestRide') : t('howToEarnWithSwiftRide')}
             </h1>
@@ -386,7 +386,7 @@ const HowItWorks = ({ profile }: Props) => {
           <p className="mb-4 text-center text-xs font-black uppercase tracking-[0.24em] text-gray-400 dark:text-zinc-500">
             {t('switchGuide')}
           </p>
-          <div className="mx-auto flex w-full max-w-md rounded-2xl border border-gray-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+          <div className="mx-auto flex w-full max-w-md rounded-2xl border border-gray-200 bg-white/90 dark:border-zinc-700 dark:bg-zinc-800/90 backdrop-blur-sm p-2">
             {[
               { value: 'passenger' as const, label: t('passenger'), icon: Users },
               { value: 'driver' as const, label: t('driver'), icon: Car },
@@ -399,8 +399,8 @@ const HowItWorks = ({ profile }: Props) => {
                 }}
                 className={`flex-1 rounded-xl px-4 py-3 font-semibold transition-all ${
                   selectedGuide === value
-                    ? 'bg-emerald-500 text-white shadow-lg'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'bg-orange-500 text-white shadow-lg'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 <span className="flex items-center justify-center gap-2">
@@ -435,10 +435,10 @@ const HowItWorks = ({ profile }: Props) => {
                   onClick={() => setExpandedSection(isExpanded ? null : step.id)}
                   className="w-full"
                 >
-                  <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100 dark:border-zinc-700">
+                  <div className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100 dark:border-zinc-700">
                     <div className="flex items-start gap-4">
                       {/* Step Number Circle */}
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center text-white font-bold text-lg`}>
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center text-white font-bold text-lg shadow-lg`}>
                         {index + 1}
                       </div>
 
@@ -482,7 +482,7 @@ const HowItWorks = ({ profile }: Props) => {
                                 transition={{ delay: i * 0.1 }}
                                 className="flex items-start gap-3"
                               >
-                                <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center mt-0.5`}>
+                                <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center mt-0.5 shadow-sm`}>
                                   <CheckCircle2 className="w-4 h-4 text-white" />
                                 </div>
                                 <span className="text-gray-700 dark:text-gray-300 leading-relaxed">
@@ -520,11 +520,11 @@ const HowItWorks = ({ profile }: Props) => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.05 }}
-                  className="bg-white dark:bg-zinc-800 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all hover:scale-105 border border-gray-100 dark:border-zinc-700"
+                  className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded-2xl p-6 shadow-md hover:shadow-lg transition-all hover:scale-105 border border-gray-100 dark:border-zinc-700"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                      <Icon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-white mb-2">
@@ -560,11 +560,11 @@ const HowItWorks = ({ profile }: Props) => {
                   initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-200 dark:border-emerald-800"
+                  className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 backdrop-blur-sm rounded-2xl p-6 border border-orange-200 dark:border-orange-800"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-white mb-2">
@@ -586,7 +586,7 @@ const HowItWorks = ({ profile }: Props) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-8 border border-blue-200 dark:border-blue-800"
+          className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 backdrop-blur-sm rounded-2xl p-8 border border-blue-200 dark:border-blue-800"
         >
           <div className="flex items-start gap-4 mb-6">
             <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
@@ -626,7 +626,7 @@ const HowItWorks = ({ profile }: Props) => {
           transition={{ delay: 0.7 }}
           className="mt-12 text-center"
         >
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-8 border border-gray-100 dark:border-zinc-700">
+          <div className="bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded-2xl p-8 border border-gray-100 dark:border-zinc-700">
             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
               {t('readyToGetStarted')}
             </h3>
@@ -634,10 +634,10 @@ const HowItWorks = ({ profile }: Props) => {
               {isPassengerGuide ? t('requestFirstRide') : t('startEarningToday')}
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
-              <button className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-colors">
+              <button className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors active:scale-95 shadow-lg shadow-orange-500/25">
                 {isPassengerGuide ? t('requestARide') : t('becomeADriver')}
               </button>
-              <button className="px-8 py-3 bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-900 dark:text-white font-bold rounded-xl transition-colors">
+              <button className="px-8 py-3 bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-900 dark:text-white font-bold rounded-xl transition-colors active:scale-95">
                 {t('needHelp')}
               </button>
             </div>

@@ -1,7 +1,7 @@
 import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF } from '@react-google-maps/api';
 import { useEffect, useRef, useState } from 'react';
 import { UserProfile } from '../lib/firebase';
-import { Satellite, Map as MapIcon } from 'lucide-react';
+import { Satellite, Map as MapIcon, Layers, Compass, Maximize2, Minimize2 } from 'lucide-react';
 
 interface MapMarker {
   id: string;
@@ -39,16 +39,18 @@ interface MapComponentProps {
   onMapClick?: (position: { lat: number; lng: number }) => void;
   height?: string;
   showMapTypeControl?: boolean;
+  fullscreen?: boolean;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyA0x1maORlZEkKWdFgxDBuDukI4mOMDlb0';
 const GOOGLE_MAPS_MAP_ID = (import.meta as any).env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 const MAP_LIBRARIES: ('marker')[] = ['marker'];
 
-const defaultCenter = { lat: 51.5074, lng: -0.1278 }; // London
+const defaultCenter = { lat: -1.9441, lng: 30.0619 }; // Kigali, Rwanda
 
 type AdvancedMarkerInstance = {
-  marker: google.maps.marker.AdvancedMarkerElement;t
+  marker: google.maps.marker.AdvancedMarkerElement;
   listener: google.maps.MapsEventListener;
 };
 
@@ -64,14 +66,19 @@ export default function MapComponent({
   onMarkerClick,
   onMapClick,
   height = '400px',
-  showMapTypeControl = true
+  showMapTypeControl = true,
+  fullscreen = false,
+  onFullscreenChange
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [cameraCenter, setCameraCenter] = useState(center);
   const [cameraZoom, setCameraZoom] = useState(zoom);
+  const [isFullscreen, setIsFullscreen] = useState(fullscreen);
   const [generatedRoutes, setGeneratedRoutes] = useState<MapRoute[]>([]);
+  const [showControls, setShowControls] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
   const advancedMarkersRef = useRef<AdvancedMarkerInstance[]>([]);
   const directionsKey = JSON.stringify(directionRequests);
   const centerKey = JSON.stringify(center);
@@ -89,15 +96,15 @@ export default function MapComponent({
   const getMarkerColor = (type: string) => {
     switch (type) {
       case 'passenger':
-        return '#2563eb';
+        return '#f97316';
       case 'rider':
-        return '#16a34a';
+        return '#10b981';
       case 'nearby':
         return '#eab308';
       case 'destination':
-        return '#dc2626';
+        return '#ef4444';
       default:
-        return '#dc2626';
+        return '#f97316';
     }
   };
 
@@ -120,6 +127,49 @@ export default function MapComponent({
     setSelectedMarker(marker);
     onMarkerClick?.(marker);
   };
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    
+    if (!isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  const handleFullscreenChange = () => {
+    const newFullscreen = !!document.fullscreenElement;
+    setIsFullscreen(newFullscreen);
+    onFullscreenChange?.(newFullscreen);
+    
+    // Delay resize to ensure fullscreen transition completes
+    setTimeout(() => {
+      if (map) {
+        google.maps.event.trigger(map, 'resize');
+        map.setCenter(cameraCenter);
+        map.setZoom(cameraZoom);
+      }
+    }, 100);
+  };
+
+  const recenterMap = () => {
+    if (map) {
+      map.setCenter(center);
+      map.setZoom(zoom);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (!freezeViewport) {
@@ -149,10 +199,10 @@ export default function MapComponent({
     advancedMarkersRef.current = markers.map((markerData) => {
       const pin = new PinElement({
         background: getMarkerColor(markerData.type),
-        borderColor: '#111827',
+        borderColor: '#1f2937',
         glyphColor: '#ffffff',
         glyph: getMarkerGlyph(markerData.type),
-        scale: markerData.type === 'destination' ? 1.1 : 1
+        scale: markerData.type === 'destination' ? 1.2 : 1
       });
 
       const advancedMarker = new AdvancedMarkerElement({
@@ -283,13 +333,41 @@ export default function MapComponent({
     }
   }, [autoFit, map, markersKey, displayedRoutesKey]);
 
+  // Auto-hide controls after inactivity on mobile
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleUserInteraction = () => {
+      setShowControls(true);
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    };
+    
+    const container = containerRef.current;
+    container.addEventListener('touchstart', handleUserInteraction);
+    container.addEventListener('mousedown', handleUserInteraction);
+    
+    return () => {
+      container.removeEventListener('touchstart', handleUserInteraction);
+      container.removeEventListener('mousedown', handleUserInteraction);
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
   if (loadError) {
     return (
       <div
-        className="flex items-center justify-center rounded-[1.5rem] bg-gray-100 text-sm text-gray-500"
+        className="flex items-center justify-center rounded-2xl bg-gray-100/90 dark:bg-gray-800/90 backdrop-blur-sm text-sm text-gray-500"
         style={{ height }}
       >
-        Unable to load Google Maps right now.
+        <div className="text-center p-4">
+          <p className="font-semibold mb-2">Unable to load Google Maps</p>
+          <p className="text-xs">Please check your internet connection</p>
+        </div>
       </div>
     );
   }
@@ -297,54 +375,79 @@ export default function MapComponent({
   if (!isLoaded) {
     return (
       <div
-        className="flex items-center justify-center rounded-[1.5rem] bg-gray-100 text-sm text-gray-500"
+        className="flex items-center justify-center rounded-2xl bg-gray-100/90 dark:bg-gray-800/90 backdrop-blur-sm text-sm text-gray-500"
         style={{ height }}
       >
-        Loading map...
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-xs">Loading map...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="relative" style={{ height }}>
-      {/* Map Type Controls */}
+    <div 
+      ref={containerRef}
+      className={`relative ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+      style={{ height: isFullscreen ? '100vh' : height }}
+    >
+      {/* Map Type Controls - Floating Action Buttons */}
       {showMapTypeControl && (
-        <div className="absolute top-4 right-4 z-10 flex gap-2 bg-white rounded-2xl shadow-lg p-2">
-          <button
-            onClick={() => setMapType('roadmap')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-              mapType === 'roadmap'
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } flex items-center gap-1`}
-          >
-            <MapIcon className="w-4 h-4" />
-            Map
-          </button>
-          <button
-            onClick={() => setMapType('hybrid')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-              mapType === 'hybrid'
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } flex items-center gap-1`}
-          >
-            <Satellite className="w-4 h-4" />
-            Hybrid
-          </button>
-          <button
-            onClick={() => setMapType('satellite')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-              mapType === 'satellite'
-                ? 'bg-black text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } flex items-center gap-1`}
-          >
-            <Satellite className="w-4 h-4" />
-            Satellite
-          </button>
+        <div 
+          className={`absolute top-4 right-4 z-10 transition-all duration-300 ${
+            showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-[-10px] pointer-events-none'
+          }`}
+        >
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setMapType(mapType === 'roadmap' ? 'hybrid' : 'roadmap')}
+              className="w-12 h-12 rounded-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-lg flex items-center justify-center active:scale-95 transition-all border border-gray-200 dark:border-gray-700"
+              title="Toggle map type"
+            >
+              {mapType === 'roadmap' ? (
+                <Satellite className="w-5 h-5 text-orange-500" />
+              ) : (
+                <MapIcon className="w-5 h-5 text-orange-500" />
+              )}
+            </button>
+            
+            <button
+              onClick={recenterMap}
+              className="w-12 h-12 rounded-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-lg flex items-center justify-center active:scale-95 transition-all border border-gray-200 dark:border-gray-700"
+              title="Recentermap"
+            >
+              <Compass className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            </button>
+            
+            <button
+              onClick={toggleFullscreen}
+              className="w-12 h-12 rounded-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-lg flex items-center justify-center active:scale-95 transition-all border border-gray-200 dark:border-gray-700"
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              ) : (
+                <Maximize2 className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+              )}
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Map Type Indicator - Bottom Center */}
+      <div 
+        className={`absolute bottom-20 left-1/2 -translate-x-1/2 z-10 transition-all duration-300 ${
+          showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-[10px] pointer-events-none'
+        }`}
+      >
+        <div className="bg-black/70 backdrop-blur-md rounded-full px-4 py-2">
+          <p className="text-white text-[10px] font-semibold uppercase tracking-wider">
+            {mapType === 'roadmap' ? 'Map View' : mapType === 'satellite' ? 'Satellite View' : 'Hybrid View'}
+          </p>
+        </div>
+      </div>
+
       <GoogleMap
         onLoad={(mapInstance) => setMap(mapInstance)}
         onUnmount={() => setMap(null)}
@@ -358,18 +461,21 @@ export default function MapComponent({
         mapContainerStyle={{
           width: '100%',
           height: '100%',
-          borderRadius: '1.5rem'
+          borderRadius: isFullscreen ? '0' : '1.5rem'
         }}
         center={cameraCenter}
         zoom={cameraZoom}
         mapTypeId={mapType}
         options={{
           mapId: GOOGLE_MAPS_MAP_ID,
-          disableDefaultUI: false,
+          disableDefaultUI: true,
           zoomControl: true,
           mapTypeControl: false,
-          fullscreenControl: true,
+          fullscreenControl: false,
           streetViewControl: false,
+          zoomControlOptions: {
+            position: google.maps.ControlPosition.RIGHT_BOTTOM
+          },
           styles: [
             {
               featureType: 'poi',
@@ -378,62 +484,139 @@ export default function MapComponent({
             }
           ]
         }}
-    >
-      {/* Show nearby drivers radius circle */}
-      {showNearbyDrivers && (
-        <CircleF
-          center={center}
-          radius={10000}
-          options={{
-            fillColor: '#10b981',
-            fillOpacity: 0.1,
-            strokeColor: '#10b981',
-            strokeOpacity: 0.3,
-            strokeWeight: 1,
-            editable: false,
-            draggable: false
-          }}
-        />
-      )}
+      >
+        {/* Show nearby drivers radius circle */}
+        {showNearbyDrivers && (
+          <CircleF
+            center={center}
+            radius={5000}
+            options={{
+              fillColor: '#f97316',
+              fillOpacity: 0.08,
+              strokeColor: '#f97316',
+              strokeOpacity: 0.3,
+              strokeWeight: 1.5,
+              editable: false,
+              draggable: false
+            }}
+          />
+        )}
 
-      {/* Routes/Polylines */}
-      {displayedRoutes.map((route) => (
-        <PolylineF
-          key={route.id}
-          path={route.points}
-          options={{
-            strokeColor: route.color || '#3b82f6',
-            strokeOpacity: 0.7,
-            strokeWeight: 3,
-            geodesic: true,
-            clickable: false
-          }}
-        />
-      ))}
+        {/* Routes/Polylines */}
+        {displayedRoutes.map((route) => (
+          <PolylineF
+            key={route.id}
+            path={route.points}
+            options={{
+              strokeColor: route.color || '#f97316',
+              strokeOpacity: 0.9,
+              strokeWeight: 4,
+              geodesic: true,
+              clickable: false
+            }}
+          />
+        ))}
 
-      {/* InfoWindow for selected marker */}
-      {selectedMarker?.profile && (
-        <InfoWindowF
-          position={selectedMarker.position}
-          onCloseClick={() => setSelectedMarker(null)}
-        >
-          <div className="bg-white rounded-lg p-3 shadow-lg max-w-xs">
-            <p className="font-bold text-gray-900">{selectedMarker.profile.name}</p>
-            {selectedMarker.profile.rating && (
-              <p className="text-sm text-amber-600">⭐ {selectedMarker.profile.rating}</p>
-            )}
-            {selectedMarker.profile.phoneNumber && (
-              <a
-                href={`tel:${selectedMarker.profile.phoneNumber}`}
-                className="text-blue-600 text-sm hover:underline"
-              >
-                📞 Call
-              </a>
-            )}
-          </div>
-        </InfoWindowF>
-      )}
+        {/* InfoWindow for selected marker */}
+        {selectedMarker?.profile && (
+          <InfoWindowF
+            position={selectedMarker.position}
+            onCloseClick={() => setSelectedMarker(null)}
+          >
+            <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-xl p-3 shadow-lg max-w-[220px] border border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2 mb-2">
+                {selectedMarker.profile.avatarUrl ? (
+                  <img src={selectedMarker.profile.avatarUrl} className="w-8 h-8 rounded-full object-cover" alt="" />
+                ) : (
+                  <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">
+                      {selectedMarker.profile.name?.charAt(0) || 'U'}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                    {selectedMarker.profile.name}
+                  </p>
+                  {selectedMarker.profile.rating && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" />
+                      {selectedMarker.profile.rating}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {selectedMarker.profile.phoneNumber && (
+                <a
+                  href={`tel:${selectedMarker.profile.phoneNumber}`}
+                  className="inline-flex items-center gap-1 text-orange-500 text-xs font-medium hover:underline"
+                >
+                  <Phone className="w-3 h-3" />
+                  Call Driver
+                </a>
+              )}
+            </div>
+          </InfoWindowF>
+        )}
       </GoogleMap>
+
+      {/* Bottom Menu Bar - iOS Style */}
+      <div className={`absolute bottom-0 left-0 right-0 z-20 transition-all duration-300 ${
+        showControls ? 'translate-y-0' : 'translate-y-full'
+      }`}>
+        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 shadow-lg">
+          <div className="max-w-md mx-auto px-4 py-2">
+            <div className="flex items-center justify-around">
+              {/* Home Button */}
+              <button 
+                className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl active:scale-95 transition-all"
+                onClick={() => window.location.href = '/'}
+              >
+                <MapIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">Map</span>
+              </button>
+              
+              {/* Search Button */}
+              <button 
+                className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl active:scale-95 transition-all"
+                onClick={() => {
+                  // Trigger search
+                  const searchInput = document.querySelector('input[placeholder*="Where to"]') as HTMLInputElement;
+                  if (searchInput) searchInput.focus();
+                }}
+              >
+                <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center">
+                  <span className="text-white text-[10px] font-bold">?</span>
+                </div>
+                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">Search</span>
+              </button>
+              
+              {/* Profile Button */}
+              <button 
+                className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl active:scale-95 transition-all"
+                onClick={() => {
+                  // Navigate to profile
+                  const profileTab = document.querySelector('[data-tab="profile"]') as HTMLElement;
+                  if (profileTab) profileTab.click();
+                }}
+              >
+                <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-gray-600 dark:text-gray-300 text-[10px] font-bold">U</span>
+                </div>
+                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400">Profile</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Home Indicator for iOS */}
+          <div className="pb-2 flex justify-center">
+            <div className="w-32 h-1 bg-gray-300 dark:bg-gray-700 rounded-full" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
+// Import missing icons
+import { Star, Phone } from 'lucide-react';

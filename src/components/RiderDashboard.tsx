@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, subscribeToAvailableRides, subscribeToUserRides, Ride, updateRideStatus, updateUserLocation, updateDoc, doc, db, getUserProfile, RideStatus, updateDriverStatus, reverseGeocode } from '../lib/firebase';
-import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target, Phone, X } from 'lucide-react';
+import { MapPin, Navigation, DollarSign, CheckCircle2, Navigation2, Loader2, ArrowRight, User, Award, ShieldCheck, Star, Car, Heart, Timer, Target, Phone, X, Settings, Moon, Sun, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
@@ -51,7 +51,6 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [selectedRidePreviewId, setSelectedRidePreviewId] = useState<string | null>(null);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
-  // Track which rides have had their end confirmation notification sent
   const endConfirmationSentRef = useRef<Set<string>>(new Set());
   const effectiveRiderLocation = riderLocation || profile.currentLocation || null;
   const manualLocationAnchor =
@@ -59,7 +58,6 @@ export default function RiderDashboard({ user, profile }: Props) {
       ? profile.manualLocationAnchor
       : null;
 
-  // Badge logic
   const possibleBadges = [
     { id: 'Top Navigator', earned: profile.rating >= 4.8 },
     { id: 'Safe Driver', earned: profile.totalTrips >= 5 },
@@ -89,7 +87,6 @@ export default function RiderDashboard({ user, profile }: Props) {
     const earnedBadgeIds = possibleBadges.filter(b => b.earned).map(b => b.id);
     const currentBadges = profile.badges || [];
     
-    // If we have new badges that aren't in the profile yet, update them
     if (earnedBadgeIds.length > 0 && !earnedBadgeIds.every(id => currentBadges.includes(id))) {
       updateDoc(doc(db, 'users', user.uid), {
         badges: Array.from(new Set([...currentBadges, ...earnedBadgeIds]))
@@ -104,22 +101,18 @@ export default function RiderDashboard({ user, profile }: Props) {
   ];
 
   useEffect(() => {
-    // Subscribe to rides requested by others
     const subAvailable = subscribeToAvailableRides((rides) => {
       let filtered = rides.filter(r => r.passengerId !== user.uid);
       
-      // Filter by vehicle type if rider has one
       if (profile.vehicleType) {
         filtered = filtered.filter(ride => !ride.vehicleType || ride.vehicleType === profile.vehicleType);
       }
       
-      // Filter by radius if set and rider has a location
       if (profile.availabilityRadius && effectiveRiderLocation) {
         filtered = filtered.filter(ride => {
           const latDiff = Math.abs(ride.pickup.lat - effectiveRiderLocation.lat);
           const lngDiff = Math.abs(ride.pickup.lng - effectiveRiderLocation.lng);
           const distance = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lngDiff, 2));
-          // roughly distance * 111 for km. So distance * 111 <= radius.
           return (distance * 111) <= profile.availabilityRadius!;
         });
       }
@@ -131,7 +124,6 @@ export default function RiderDashboard({ user, profile }: Props) {
       setAvailableRides(filtered);
     });
 
-    // Subscribe to rides accepted by me
     const subMyRides = subscribeToUserRides(user.uid, 'rider', (rides) => {
       const active = rides.find(r => ['accepted', 'arrived', 'ongoing'].includes(r.status));
       
@@ -174,7 +166,6 @@ export default function RiderDashboard({ user, profile }: Props) {
         lastStatusRef.current = active.status;
       }
       
-      // Clean up tracking when ride is no longer active
       const completedRides = rides.filter(r => r.status === 'completed');
       completedRides.forEach(ride => {
         endConfirmationSentRef.current.delete(ride.id);
@@ -189,19 +180,14 @@ export default function RiderDashboard({ user, profile }: Props) {
     };
   }, [user.uid, addNotification, profile.availabilityRadius, effectiveRiderLocation?.lat, effectiveRiderLocation?.lng, profile.vehicleType]);
 
-  // Update driver status based on active ride
   useEffect(() => {
     if (!activeRide) {
-      // Driver is available and not in an active ride
       updateDriverStatus(user.uid, 'active').catch(console.error);
     } else {
-      // Driver is currently in an active ride
       updateDriverStatus(user.uid, 'riding').catch(console.error);
     }
   }, [activeRide, user.uid]);
 
-
-  // Real-time location tracking using Geolocation API
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
 
@@ -306,7 +292,6 @@ export default function RiderDashboard({ user, profile }: Props) {
           updatedAt: serverTimestamp()
         });
         
-        // Send notification to driver only once per ride
         if (!endConfirmationSentRef.current.has(activeRide.id)) {
           addNotification(
             'Ride Ending',
@@ -359,7 +344,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-driver-to-pickup-${activeRide.id}`,
             origin: effectiveRiderLocation!,
             destination: ridePickupLocation,
-            color: '#10b981'
+            color: '#f97316'
           }]
         : []),
       ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
@@ -369,7 +354,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-pickup-to-destination-${activeRide.id}`,
             origin: ridePickupLocation,
             destination: rideDestination,
-            color: '#60a5fa'
+            color: '#f97316'
           }]
         : []),
       ...(activeRide.status === 'ongoing' &&
@@ -379,7 +364,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-live-trip-${activeRide.id}`,
             origin: effectiveRiderLocation!,
             destination: rideDestination,
-            color: '#2563eb'
+            color: '#f97316'
           }]
         : [])
     ];
@@ -420,12 +405,15 @@ export default function RiderDashboard({ user, profile }: Props) {
 
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">{t('activeDuty')}</h2>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('activeDuty')}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">You're on an active ride</p>
+        </div>
         
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
+          className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-800"
         >
           {rideMapMarkers.length > 0 ? (
             <div className="p-3 sm:p-4">
@@ -441,70 +429,87 @@ export default function RiderDashboard({ user, profile }: Props) {
             </div>
           ) : (
             <div className="px-8 pt-8">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                 The map will appear once pickup or rider location data is available.
               </div>
             </div>
           )}
 
-          <div className="relative z-10 p-8 pt-4 space-y-8">
+          <div className="relative z-10 p-6 space-y-6">
             <div className="flex justify-between items-start">
-              <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-500/10 rounded-full mb-3">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    activeRide.status === 'accepted' ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'
+                  }`} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                    {t(activeRide.status as any)}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  {activeRide.status === 'accepted' ? t('headingToPickup') : 
+                   activeRide.status === 'arrived' ? t('waitingAtPickup') : 
+                   t('headingToDestination')}
+                </h3>
                 {passengerProfile && (
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleToggleFavorite(passengerProfile.uid)}
-                      className={`p-3 rounded-2xl transition-all active:scale-95 border ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-white/5 border-white/10 text-white/40'}`}
-                    >
-                      <Heart className={`w-6 h-6 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
-                    </button>
-                    <a 
-                      href={`tel:${passengerProfile.phoneNumber}`}
-                      className="p-3 rounded-2xl transition-all active:scale-95 border bg-emerald-500/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30"
-                      title={`Call ${passengerProfile.name}`}
-                    >
-                      <Phone className="w-6 h-6" />
-                    </a>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleToggleFavorite(passengerProfile.uid)}
+                        className={`p-2 rounded-xl transition-all active:scale-95 ${
+                          profile.favoriteUserIds?.includes(passengerProfile.uid) 
+                            ? 'bg-red-50 dark:bg-red-500/20 text-red-500' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
+                      </button>
+                      <a 
+                        href={`tel:${passengerProfile.phoneNumber}`}
+                        className="p-2 rounded-xl transition-all active:scale-95 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Passenger: <span className="font-semibold text-gray-900 dark:text-white">{passengerProfile.name}</span>
+                      </p>
+                    </div>
                   </div>
                 )}
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    {t(activeRide.status as any)}
-                  </div>
-                  <h3 className="text-4xl font-bold mb-2">
-                    {activeRide.status === 'accepted' ? t('headingToPickup') : activeRide.status === 'arrived' ? t('waitingAtPickup') : t('headingToDestination')}
-                  </h3>
-                  {passengerProfile && (
-                      <p className="text-sm font-medium text-white/60">
-                        {t('passenger')}: <span className="text-white font-bold">{passengerProfile.name}</span>
-                      </p>
-                  )}
-                </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('fareToBeNegotiated')}</p>
-                <p className="text-lg font-bold text-emerald-400">{t('byAgreement')}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">{t('fareToBeNegotiated')}</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{t('byAgreement')}</p>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activeRide.status === 'accepted' ? 'bg-white text-black' : 'bg-white/10 text-white/40'}`}>
-                  <MapPin className="w-5 h-5" />
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  activeRide.status === 'accepted' 
+                    ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                }`}>
+                  <MapPin className="w-4 h-4" />
                 </div>
-                <div>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('pickupLocation')}</p>
-                  <p className="font-medium text-lg leading-tight">{activeRide.pickup.address}</p>
+                <div className="flex-1">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">{t('pickupLocation')}</p>
+                  <p className="font-medium text-sm text-gray-900 dark:text-white">{activeRide.pickup.address}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activeRide.status === 'ongoing' ? 'bg-white text-black' : 'bg-white/10 text-white/40'}`}>
-                  <Navigation className="w-5 h-5" />
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  activeRide.status === 'ongoing' 
+                    ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                }`}>
+                  <Navigation className="w-4 h-4" />
                 </div>
-                <div>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('destinationAddress')}</p>
-                  <p className="font-medium text-lg leading-tight">{activeRide.destination.address}</p>
+                <div className="flex-1">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">{t('destinationAddress')}</p>
+                  <p className="font-medium text-sm text-gray-900 dark:text-white">{activeRide.destination.address}</p>
                 </div>
               </div>
             </div>
@@ -512,19 +517,19 @@ export default function RiderDashboard({ user, profile }: Props) {
             <button 
               onClick={handleNextStep}
               disabled={riderActionDisabled}
-              className="w-full bg-white text-black py-5 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-orange-500 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/25"
             >
               {riderActionLabel}
-              <ArrowRight className="w-6 h-6" />
+              <ArrowRight className="w-5 h-5" />
             </button>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-800">
               {riderActionHint}
             </div>
 
             {activeRide.status === 'accepted' && (
               <div className="flex justify-center">
-                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest flex items-center gap-2">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-2">
                   <Timer className="w-3 h-3" />
                   {t('beOnTime')}
                 </p>
@@ -572,7 +577,7 @@ export default function RiderDashboard({ user, profile }: Props) {
           id: `preview-driver-to-pickup-${previewRide?.id || 'route'}`,
           origin: effectiveRiderLocation,
           destination: previewPickupLocation,
-          color: '#10b981'
+          color: '#f97316'
         }]
       : []),
     ...(previewPickupLocation && previewDestinationLocation
@@ -580,7 +585,7 @@ export default function RiderDashboard({ user, profile }: Props) {
           id: `preview-trip-${previewRide?.id || 'route'}`,
           origin: previewPickupLocation,
           destination: previewDestinationLocation,
-          color: '#60a5fa'
+          color: '#f97316'
         }]
       : [])
   ];
@@ -598,60 +603,65 @@ export default function RiderDashboard({ user, profile }: Props) {
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} className="w-16 h-16 rounded-2xl border-4 border-white shadow-lg" />
-            ) : (
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center border-4 border-white shadow-lg">
-                <User className="w-8 h-8 text-gray-400" />
+    <div className="space-y-6">
+      {/* Profile Card */}
+      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} className="w-14 h-14 rounded-xl object-cover border-2 border-orange-500/20" alt="" />
+              ) : (
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
+                  <User className="w-7 h-7 text-white" />
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900">
+                <ShieldCheck className="w-2.5 h-2.5 text-white" />
               </div>
-            )}
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center border border-white">
-              <ShieldCheck className="w-3 h-3 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{profile.name}</h2>
+              {profile.vehicleModel ? (
+                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <Car className="w-3 h-3" />
+                  {profile.vehicleModel} • {profile.numberPlate}
+                </p>
+              ) : (
+                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{profile.role}</p>
+              )}
             </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">{profile.name}</h2>
-            {profile.vehicleModel ? (
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                {profile.vehicleType === 'car' ? <Car className="w-3 h-3" /> : <Navigation2 className="w-3 h-3" />}
-                {profile.vehicleModel} • {profile.numberPlate}
-              </p>
-            ) : (
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{profile.role}</p>
-            )}
+          <div className="text-right">
+            <button 
+              onClick={() => updateDoc(doc(db, 'users', user.uid), { isOnline: !profile.isOnline }).catch(console.error)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <div className={`w-2 h-2 rounded-full ${profile.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="font-semibold text-[10px] uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                {profile.isOnline ? t('available') : t('unavailable')}
+              </span>
+            </button>
           </div>
-        </div>
-        <div className="text-right flex flex-col items-end gap-1">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Status</p>
-          <button 
-            onClick={() => updateDoc(doc(db, 'users', user.uid), { isOnline: !profile.isOnline }).catch(console.error)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors border border-gray-100"
-          >
-            <div className={`w-2 h-2 rounded-full ${profile.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
-            <span className="font-bold text-xs uppercase tracking-wider">{profile.isOnline ? t('available') : t('unavailable')}</span>
-          </button>
         </div>
       </div>
 
+      {/* Availability Radius Card */}
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4"
+        className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Target className="w-5 h-5 text-emerald-500" />
-            <h3 className="font-bold text-lg tracking-tight">Availability Radius</h3>
+            <Target className="w-5 h-5 text-orange-500" />
+            <h3 className="font-semibold text-gray-900 dark:text-white">Availability Radius</h3>
           </div>
-          <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+          <span className="bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
             {profile.availabilityRadius || 10} km
           </span>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3">
           <input 
             type="range" 
             min="1" 
@@ -659,25 +669,25 @@ export default function RiderDashboard({ user, profile }: Props) {
             step="1"
             value={profile.availabilityRadius || 10}
             onChange={(e) => updateDoc(doc(db, 'users', user.uid), { availabilityRadius: parseInt(e.target.value) })}
-            className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-600 transition-all"
+            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500 hover:accent-orange-600 transition-all"
           />
-          <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">
+          <div className="flex justify-between text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1">
             <span>1 KM</span>
             <span>25 KM</span>
             <span>50 KM</span>
           </div>
-          <p className="text-xs text-gray-400 font-medium leading-relaxed">
+          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
             {t('availabilityRadiusDescription')}
           </p>
         </div>
       </motion.div>
 
-      {/* Driver Map View - Show when waiting for rides */}
+      {/* Map View */}
       {!activeRide && effectiveRiderLocation && hasValidCoordinates(effectiveRiderLocation) && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
+          className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-800"
         >
           <div className="p-3 sm:p-4">
             <MapComponent
@@ -690,19 +700,23 @@ export default function RiderDashboard({ user, profile }: Props) {
               autoFit={!!previewRide}
             />
           </div>
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4 text-sm text-white/80">
+          <div className="border-t border-gray-100 dark:border-gray-800 p-4">
             <div className="flex justify-between items-center">
               <div>
-                <p className="font-semibold">
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">
                   {previewRide ? 'Previewing a live request route' : 'Waiting for ride requests...'}
                 </p>
-                <p className="text-xs text-white/50">
-                  {previewRide ? `${previewRide.pickup.address} to ${previewRide.destination.address}` : 'Your location is visible to nearby passengers'}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {previewRide ? `${previewRide.pickup.address.substring(0, 40)}...` : 'Your location is visible to nearby passengers'}
                 </p>
               </div>
               <button
                 onClick={() => setIsPickingOnMap(!isPickingOnMap)}
-                className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${isPickingOnMap ? 'bg-emerald-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'}`}
+                className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
+                  isPickingOnMap 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/25'
+                }`}
               >
                 {isPickingOnMap ? 'Cancel' : 'Pick Location'}
               </button>
@@ -711,44 +725,56 @@ export default function RiderDashboard({ user, profile }: Props) {
         </motion.div>
       )}
 
-      {/* Map Location Picker */}
-      {isPickingOnMap && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="bg-gray-900 rounded-[2rem] overflow-hidden relative border-4 border-black"
-        >
-          <div className="absolute left-4 right-16 top-4 z-10 rounded-2xl bg-black/75 px-4 py-3 text-white shadow-xl backdrop-blur">
-            <p className="font-bold uppercase tracking-widest text-[10px]">
-              Tap on Google Map to set your location
-            </p>
-            {riderLocation && (
-              <p className="mt-2 text-xs font-semibold text-emerald-300">
-                {riderLocation.lat.toFixed(5)}, {riderLocation.lng.toFixed(5)}
-              </p>
-            )}
-          </div>
-          <MapComponent
-            center={riderPickerCenter}
-            zoom={15}
-            markers={riderPickerMarkers}
-            onMapClick={handleMapClick}
-            height="320px"
-            showNearbyDrivers={false}
-          />
-
-          <button 
-            onClick={() => setIsPickingOnMap(false)}
-            className="absolute top-4 right-4 bg-white/10 p-2 rounded-xl text-white hover:bg-white/20"
+      {/* Map Location Picker Modal */}
+      <AnimatePresence>
+        {isPickingOnMap && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
           >
-            <X className="w-4 h-4" />
-          </button>
-        </motion.div>
-      )}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-3xl overflow-hidden w-full max-w-2xl shadow-2xl"
+            >
+              <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">Set Your Location</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Tap on the map to set your current location</p>
+                </div>
+                <button 
+                  onClick={() => setIsPickingOnMap(false)}
+                  className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="relative">
+                <MapComponent
+                  center={riderPickerCenter}
+                  zoom={15}
+                  markers={riderPickerMarkers}
+                  onMapClick={handleMapClick}
+                  height="400px"
+                  showNearbyDrivers={false}
+                  showMapTypeControl={false}
+                />
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md rounded-full px-4 py-2">
+                  <p className="text-white text-xs font-semibold">📍 Tap anywhere on the map</p>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* Available Jobs Section */}
       <div>
-        <h2 className="text-4xl font-bold tracking-tight mb-2">{t('availableJobs')}</h2>
-        <p className="text-gray-500">{t('pickupPassengersNearby')}</p>
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{t('availableJobs')}</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t('pickupPassengersNearby')}</p>
       </div>
 
       <AnimatePresence mode="popLayout">
@@ -756,13 +782,13 @@ export default function RiderDashboard({ user, profile }: Props) {
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-white p-12 rounded-3xl border border-dashed border-gray-200 text-center"
+            className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm p-12 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 text-center"
           >
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Loader2 className="w-8 h-8 text-gray-300 animate-spin" />
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Zap className="w-8 h-8 text-gray-400 dark:text-gray-600" />
             </div>
-            <p className="font-semibold text-gray-900">{t('waitingForRequests')}</p>
-            <p className="text-sm text-gray-400">{t('freshRidesAppear')}</p>
+            <p className="font-semibold text-gray-900 dark:text-white">{t('waitingForRequests')}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('freshRidesAppear')}</p>
           </motion.div>
         ) : (
           <div className="grid gap-4">
@@ -775,51 +801,53 @@ export default function RiderDashboard({ user, profile }: Props) {
                 exit={{ opacity: 0, scale: 0.9 }}
                 onClick={() => setSelectedRidePreviewId(ride.id)}
                 onMouseEnter={() => setSelectedRidePreviewId(ride.id)}
-                className={`bg-white p-6 rounded-3xl border shadow-sm transition-all group cursor-pointer ${
+                className={`bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-2xl border shadow-sm transition-all cursor-pointer overflow-hidden ${
                   selectedRidePreviewId === ride.id
-                    ? 'border-black ring-2 ring-black/10'
-                    : 'border-gray-100 hover:border-black hover:shadow-md'
+                    ? 'border-orange-500 ring-2 ring-orange-500/20'
+                    : 'border-gray-100 dark:border-gray-800 hover:border-orange-500/50'
                 }`}
               >
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center">
-                      <User className="w-6 h-6 text-gray-300" />
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+                        <User className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{t('passengerRequest')}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">~ 2.4 km away</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold">{t('passengerRequest')}</p>
-                      <p className="text-xs text-gray-400">~ 2.4 bits {t('away')}</p>
+                    <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-xl font-semibold text-xs">
+                      {t('byAgreement')}
                     </div>
                   </div>
-                  <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-bold text-sm">
-                    {t('byAgreement')}
-                  </div>
-                </div>
 
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-start gap-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-black mt-1.5" />
-                    <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">From</p>
-                      <p className="text-sm font-semibold text-gray-600">{ride.pickup.address}</p>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5" />
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">From</p>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{ride.pickup.address}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5" />
+                      <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">To</p>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{ride.destination.address}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-start gap-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5" />
-                    <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none mb-1">To</p>
-                      <p className="text-sm font-semibold text-gray-600">{ride.destination.address}</p>
-                    </div>
-                  </div>
-                </div>
 
-                <button 
-                  onClick={() => handleAccept(ride.id)}
-                  className="w-full bg-black text-white py-4 px-6 rounded-2xl font-bold flex items-center justify-between hover:bg-gray-800 transition-all group-hover:scale-[1.02] shadow-xl shadow-black/5"
-                >
-                  {t('acceptRide')}
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
+                  <button 
+                    onClick={() => handleAccept(ride.id)}
+                    className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold flex items-center justify-between hover:bg-orange-600 transition-all active:scale-95 shadow-lg shadow-orange-500/25"
+                  >
+                    {t('acceptRide')}
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -827,15 +855,15 @@ export default function RiderDashboard({ user, profile }: Props) {
       </AnimatePresence>
 
       {/* Badges Section */}
-      <div className="space-y-6 pt-12">
+      <div className="space-y-4 pt-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold tracking-tight">{t('achievements')}</h3>
-          <div className="flex items-center gap-1 text-amber-500 font-bold text-sm">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('achievements')}</h3>
+          <div className="flex items-center gap-1 text-amber-500 font-semibold text-sm">
             <Star className="w-4 h-4 fill-current" />
             {profile.rating} {t('rating')}
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {displayBadges.map((badge, i) => (
             <motion.div 
               key={i}
@@ -843,15 +871,23 @@ export default function RiderDashboard({ user, profile }: Props) {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className={`p-5 rounded-[2rem] border-2 transition-all ${badge.earned ? 'bg-white border-emerald-100 shadow-lg shadow-emerald-500/5' : 'bg-gray-50 border-transparent opacity-50 grayscale'}`}
+              className={`p-4 rounded-2xl border-2 transition-all ${
+                badge.earned 
+                  ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-orange-500/30 shadow-lg shadow-orange-500/5' 
+                  : 'bg-gray-50/50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-800 opacity-50 grayscale'
+              }`}
             >
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${badge.earned ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/30' : 'bg-gray-200 text-gray-400'}`}>
-                <badge.icon className="w-6 h-6" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
+                badge.earned 
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' 
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+              }`}>
+                <badge.icon className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-sm mb-1">{badge.title}</h4>
-              <p className="text-[10px] text-gray-500 font-medium leading-relaxed">{badge.description}</p>
+              <h4 className="font-semibold text-sm text-gray-900 dark:text-white mb-1">{badge.title}</h4>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed">{badge.description}</p>
               {badge.earned && (
-                <div className="mt-4 flex items-center gap-1.5 text-[9px] font-bold text-emerald-600 uppercase tracking-wider">
+                <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
                   <CheckCircle2 className="w-3 h-3" />
                   {t('earnedBadge')}
                 </div>
