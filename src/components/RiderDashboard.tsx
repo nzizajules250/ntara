@@ -54,7 +54,6 @@ export default function RiderDashboard({ user, profile }: Props) {
   const [selectedRidePreviewId, setSelectedRidePreviewId] = useState<string | null>(null);
   const prevRidesCount = useRef(0);
   const lastStatusRef = useRef<string | null>(null);
-  // Track which rides have had their end confirmation notification sent
   const endConfirmationSentRef = useRef<Set<string>>(new Set());
   const effectiveRiderLocation = riderLocation || profile.currentLocation || null;
   const manualLocationAnchor =
@@ -62,7 +61,6 @@ export default function RiderDashboard({ user, profile }: Props) {
       ? profile.manualLocationAnchor
       : null;
 
-  // Badge logic
   const possibleBadges = [
     { id: 'Top Navigator', earned: profile.rating >= 4.8 },
     { id: 'Safe Driver', earned: profile.totalTrips >= 5 },
@@ -92,7 +90,6 @@ export default function RiderDashboard({ user, profile }: Props) {
     const earnedBadgeIds = possibleBadges.filter(b => b.earned).map(b => b.id);
     const currentBadges = profile.badges || [];
     
-    // If we have new badges that aren't in the profile yet, update them
     if (earnedBadgeIds.length > 0 && !earnedBadgeIds.every(id => currentBadges.includes(id))) {
       updateDoc(doc(db, 'users', user.uid), {
         badges: Array.from(new Set([...currentBadges, ...earnedBadgeIds]))
@@ -107,22 +104,18 @@ export default function RiderDashboard({ user, profile }: Props) {
   ];
 
   useEffect(() => {
-    // Subscribe to rides requested by others
     const subAvailable = subscribeToAvailableRides((rides) => {
       let filtered = rides.filter(r => r.passengerId !== user.uid);
       
-      // Filter by vehicle type if rider has one
       if (profile.vehicleType) {
         filtered = filtered.filter(ride => !ride.vehicleType || ride.vehicleType === profile.vehicleType);
       }
       
-      // Filter by radius if set and rider has a location
       if (profile.availabilityRadius && effectiveRiderLocation) {
         filtered = filtered.filter(ride => {
           const latDiff = Math.abs(ride.pickup.lat - effectiveRiderLocation.lat);
           const lngDiff = Math.abs(ride.pickup.lng - effectiveRiderLocation.lng);
           const distance = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lngDiff, 2));
-          // roughly distance * 111 for km. So distance * 111 <= radius.
           return (distance * 111) <= profile.availabilityRadius!;
         });
       }
@@ -134,7 +127,6 @@ export default function RiderDashboard({ user, profile }: Props) {
       setAvailableRides(filtered);
     });
 
-    // Subscribe to rides accepted by me
     const subMyRides = subscribeToUserRides(user.uid, 'rider', (rides) => {
       const active = rides.find(r => ['accepted', 'arrived', 'ongoing'].includes(r.status));
       
@@ -177,7 +169,6 @@ export default function RiderDashboard({ user, profile }: Props) {
         lastStatusRef.current = active.status;
       }
       
-      // Clean up tracking when ride is no longer active
       const completedRides = rides.filter(r => r.status === 'completed');
       completedRides.forEach(ride => {
         endConfirmationSentRef.current.delete(ride.id);
@@ -192,19 +183,14 @@ export default function RiderDashboard({ user, profile }: Props) {
     };
   }, [user.uid, addNotification, profile.availabilityRadius, effectiveRiderLocation?.lat, effectiveRiderLocation?.lng, profile.vehicleType]);
 
-  // Update driver status based on active ride
   useEffect(() => {
     if (!activeRide) {
-      // Driver is available and not in an active ride
       updateDriverStatus(user.uid, 'active').catch(console.error);
     } else {
-      // Driver is currently in an active ride
       updateDriverStatus(user.uid, 'riding').catch(console.error);
     }
   }, [activeRide, user.uid]);
 
-
-  // Real-time location tracking using Geolocation API
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
 
@@ -309,7 +295,6 @@ export default function RiderDashboard({ user, profile }: Props) {
           updatedAt: serverTimestamp()
         });
         
-        // Send notification to driver only once per ride
         if (!endConfirmationSentRef.current.has(activeRide.id)) {
           addNotification(
             'Ride Ending',
@@ -362,7 +347,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-driver-to-pickup-${activeRide.id}`,
             origin: effectiveRiderLocation!,
             destination: ridePickupLocation,
-            color: '#10b981'
+            color: '#f97316'
           }]
         : []),
       ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') &&
@@ -372,7 +357,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-pickup-to-destination-${activeRide.id}`,
             origin: ridePickupLocation,
             destination: rideDestination,
-            color: '#60a5fa'
+            color: '#f97316'
           }]
         : []),
       ...(activeRide.status === 'ongoing' &&
@@ -382,7 +367,7 @@ export default function RiderDashboard({ user, profile }: Props) {
             id: `rider-live-trip-${activeRide.id}`,
             origin: effectiveRiderLocation!,
             destination: rideDestination,
-            color: '#2563eb'
+            color: '#f97316'
           }]
         : [])
     ];
@@ -423,12 +408,15 @@ export default function RiderDashboard({ user, profile }: Props) {
 
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold tracking-tight">{t('activeDuty')}</h2>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{t('activeDuty')}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">You're on an active ride</p>
+        </div>
         
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-black text-white rounded-3xl shadow-2xl relative overflow-hidden"
+          className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-3xl shadow-lg overflow-hidden border border-gray-100 dark:border-gray-800"
         >
           {rideMapMarkers.length > 0 ? (
             <div className="p-3 sm:p-4">
@@ -444,70 +432,87 @@ export default function RiderDashboard({ user, profile }: Props) {
             </div>
           ) : (
             <div className="px-8 pt-8">
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/60">
+              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                 The map will appear once pickup or rider location data is available.
               </div>
             </div>
           )}
 
-          <div className="relative z-10 p-8 pt-4 space-y-8">
+          <div className="relative z-10 p-6 space-y-6">
             <div className="flex justify-between items-start">
-              <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-50 dark:bg-orange-500/10 rounded-full mb-3">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    activeRide.status === 'accepted' ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'
+                  }`} />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                    {t(activeRide.status as any)}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                  {activeRide.status === 'accepted' ? t('headingToPickup') : 
+                   activeRide.status === 'arrived' ? t('waitingAtPickup') : 
+                   t('headingToDestination')}
+                </h3>
                 {passengerProfile && (
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleToggleFavorite(passengerProfile.uid)}
-                      className={`p-3 rounded-2xl transition-all active:scale-95 border ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'bg-red-500/20 border-red-500/30 text-red-500' : 'bg-white/5 border-white/10 text-white/40'}`}
-                    >
-                      <Heart className={`w-6 h-6 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
-                    </button>
-                    <a 
-                      href={`tel:${passengerProfile.phoneNumber}`}
-                      className="p-3 rounded-2xl transition-all active:scale-95 border bg-emerald-500/20 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30"
-                      title={`Call ${passengerProfile.name}`}
-                    >
-                      <Phone className="w-6 h-6" />
-                    </a>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleToggleFavorite(passengerProfile.uid)}
+                        className={`p-2 rounded-xl transition-all active:scale-95 ${
+                          profile.favoriteUserIds?.includes(passengerProfile.uid) 
+                            ? 'bg-red-50 dark:bg-red-500/20 text-red-500' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${profile.favoriteUserIds?.includes(passengerProfile.uid) ? 'fill-current' : ''}`} />
+                      </button>
+                      <a 
+                        href={`tel:${passengerProfile.phoneNumber}`}
+                        className="p-2 rounded-xl transition-all active:scale-95 bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      >
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        Passenger: <span className="font-semibold text-gray-900 dark:text-white">{passengerProfile.name}</span>
+                      </p>
+                    </div>
                   </div>
                 )}
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    {t(activeRide.status as any)}
-                  </div>
-                  <h3 className="text-4xl font-bold mb-2">
-                    {activeRide.status === 'accepted' ? t('headingToPickup') : activeRide.status === 'arrived' ? t('waitingAtPickup') : t('headingToDestination')}
-                  </h3>
-                  {passengerProfile && (
-                      <p className="text-sm font-medium text-white/60">
-                        {t('passenger')}: <span className="text-white font-bold">{passengerProfile.name}</span>
-                      </p>
-                  )}
-                </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('fareToBeNegotiated')}</p>
-                <p className="text-lg font-bold text-emerald-400">{t('byAgreement')}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-1">{t('fareToBeNegotiated')}</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{t('byAgreement')}</p>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activeRide.status === 'accepted' ? 'bg-white text-black' : 'bg-white/10 text-white/40'}`}>
-                  <MapPin className="w-5 h-5" />
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  activeRide.status === 'accepted' 
+                    ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                }`}>
+                  <MapPin className="w-4 h-4" />
                 </div>
-                <div>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('pickupLocation')}</p>
-                  <p className="font-medium text-lg leading-tight">{activeRide.pickup.address}</p>
+                <div className="flex-1">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">{t('pickupLocation')}</p>
+                  <p className="font-medium text-sm text-gray-900 dark:text-white">{activeRide.pickup.address}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activeRide.status === 'ongoing' ? 'bg-white text-black' : 'bg-white/10 text-white/40'}`}>
-                  <Navigation className="w-5 h-5" />
+              <div className="flex items-start gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  activeRide.status === 'ongoing' 
+                    ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-600' 
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                }`}>
+                  <Navigation className="w-4 h-4" />
                 </div>
-                <div>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-widest mb-1">{t('destinationAddress')}</p>
-                  <p className="font-medium text-lg leading-tight">{activeRide.destination.address}</p>
+                <div className="flex-1">
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider mb-0.5">{t('destinationAddress')}</p>
+                  <p className="font-medium text-sm text-gray-900 dark:text-white">{activeRide.destination.address}</p>
                 </div>
               </div>
             </div>
@@ -515,19 +520,19 @@ export default function RiderDashboard({ user, profile }: Props) {
             <button 
               onClick={handleNextStep}
               disabled={riderActionDisabled}
-              className="w-full bg-white text-black py-5 px-6 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-orange-500 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-orange-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/25"
             >
               {riderActionLabel}
-              <ArrowRight className="w-6 h-6" />
+              <ArrowRight className="w-5 h-5" />
             </button>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 px-4 py-3 text-sm text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-800">
               {riderActionHint}
             </div>
 
             {activeRide.status === 'accepted' && (
               <div className="flex justify-center">
-                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest flex items-center gap-2">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-2">
                   <Timer className="w-3 h-3" />
                   {t('beOnTime')}
                 </p>
@@ -575,7 +580,7 @@ export default function RiderDashboard({ user, profile }: Props) {
           id: `preview-driver-to-pickup-${previewRide?.id || 'route'}`,
           origin: effectiveRiderLocation,
           destination: previewPickupLocation,
-          color: '#10b981'
+          color: '#f97316'
         }]
       : []),
     ...(previewPickupLocation && previewDestinationLocation
@@ -583,7 +588,7 @@ export default function RiderDashboard({ user, profile }: Props) {
           id: `preview-trip-${previewRide?.id || 'route'}`,
           origin: previewPickupLocation,
           destination: previewDestinationLocation,
-          color: '#60a5fa'
+          color: '#f97316'
         }]
       : [])
   ];
@@ -601,42 +606,46 @@ export default function RiderDashboard({ user, profile }: Props) {
   ];
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-end justify-between bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} className="w-16 h-16 rounded-2xl border-4 border-white shadow-lg" />
-            ) : (
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center border-4 border-white shadow-lg">
-                <User className="w-8 h-8 text-gray-400" />
+    <div className="space-y-6">
+      {/* Profile Card */}
+      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-2xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} className="w-14 h-14 rounded-xl object-cover border-2 border-orange-500/20" alt="" />
+              ) : (
+                <div className="w-14 h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
+                  <User className="w-7 h-7 text-white" />
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900">
+                <ShieldCheck className="w-2.5 h-2.5 text-white" />
               </div>
-            )}
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center border border-white">
-              <ShieldCheck className="w-3 h-3 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{profile.name}</h2>
+              {profile.vehicleModel ? (
+                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                  <Car className="w-3 h-3" />
+                  {profile.vehicleModel} • {profile.numberPlate}
+                </p>
+              ) : (
+                <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{profile.role}</p>
+              )}
             </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">{profile.name}</h2>
-            {profile.vehicleModel ? (
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                {profile.vehicleType === 'car' ? <Car className="w-3 h-3" /> : <Navigation2 className="w-3 h-3" />}
-                {profile.vehicleModel} • {profile.numberPlate}
-              </p>
-            ) : (
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{profile.role}</p>
-            )}
+          <div className="text-right">
+            <button 
+              onClick={() => updateDoc(doc(db, 'users', user.uid), { isOnline: !profile.isOnline }).catch(console.error)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <div className={`w-2 h-2 rounded-full ${profile.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="font-semibold text-[10px] uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                {profile.isOnline ? t('available') : t('unavailable')}
+              </span>
+            </button>
           </div>
-        </div>
-        <div className="text-right flex flex-col items-end gap-1">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Status</p>
-          <button 
-            onClick={() => updateDoc(doc(db, 'users', user.uid), { isOnline: !profile.isOnline }).catch(console.error)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors border border-gray-100"
-          >
-            <div className={`w-2 h-2 rounded-full ${profile.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
-            <span className="font-bold text-xs uppercase tracking-wider">{profile.isOnline ? t('available') : t('unavailable')}</span>
-          </button>
         </div>
       </div>
 
