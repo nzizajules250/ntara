@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { Ride, db, getUserProfile, UserProfile } from '../lib/firebase';
-import { Download, Calendar, Filter, Loader2, AlertCircle, MapPin, Clock, DollarSign } from 'lucide-react';
+import { Download, Calendar, Filter, Loader2, AlertCircle, MapPin, Clock, DollarSign, TrendingUp, Star, ChevronDown, FileText, BarChart3, Route, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -95,7 +95,12 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
     if (profile?.name) return profile.name;
     if (profile?.firstName && profile?.lastName) return `${profile.firstName} ${profile.lastName}`;
     if (profile?.firstName) return profile.firstName;
-    return uid; // Fallback to ID if no name found
+    return uid;
+  };
+
+  const getUserAvatar = (uid: string): string | null => {
+    const profile = userProfiles[uid];
+    return profile?.avatarUrl || null;
   };
 
   const exportToCSV = () => {
@@ -135,26 +140,64 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
   const averageRating = trips.length > 0
     ? (trips.reduce((sum, trip) => sum + (trip.riderRating || 0), 0) / trips.length).toFixed(1)
     : '0';
+  const totalDistance = trips.length * 5.2; // Placeholder - replace with actual distance calculation
+
+  const stats = [
+    { 
+      label: 'Total Trips', 
+      value: trips.length.toString(), 
+      icon: Route, 
+      color: 'from-violet-400 to-purple-600',
+      bgColor: 'bg-violet-50 dark:bg-violet-500/10'
+    },
+    { 
+      label: 'Total Fare', 
+      value: `$${totalFare.toFixed(2)}`, 
+      icon: DollarSign, 
+      color: 'from-emerald-400 to-green-600',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-500/10'
+    },
+    { 
+      label: 'Avg Rating', 
+      value: averageRating, 
+      icon: Star, 
+      color: 'from-amber-400 to-orange-600',
+      bgColor: 'bg-amber-50 dark:bg-amber-500/10'
+    },
+  ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-3xl shadow-lg p-6 space-y-6"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-blue-600" />
-          Trip Report
-        </h2>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="p-3 rounded-2xl bg-gray-100 hover:bg-gray-200 transition-all"
-        >
-          <Filter className="w-5 h-5" />
-        </button>
-      </div>
+    <div className="space-y-6">
+      {/* Header with Gradient */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[3rem] p-8 shadow-2xl shadow-purple-500/20"
+      >
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+        </div>
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+              <BarChart3 className="w-8 h-8" />
+              Trip Report
+            </h2>
+            <p className="text-white/70 font-semibold">
+              {MONTHS[selectedMonth]} {selectedYear}
+            </p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center text-white hover:bg-white/30 transition-all"
+          >
+            <Filter className="w-5 h-5" />
+          </motion.button>
+        </div>
+      </motion.div>
 
       {/* Filters */}
       <AnimatePresence>
@@ -163,27 +206,31 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-4 pb-4 border-b"
+            className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-lg border border-gray-100 dark:border-zinc-800 space-y-4"
           >
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Month</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-wider px-1">
+                  Month
+                </label>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-500 outline-none"
+                  className="w-full bg-gray-50 dark:bg-zinc-800 border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 rounded-2xl px-5 py-3.5 font-semibold text-gray-900 dark:text-white transition-all outline-none"
                 >
                   {MONTHS.map((month, idx) => (
                     <option key={idx} value={idx}>{month}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Year</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 dark:text-zinc-500 uppercase tracking-wider px-1">
+                  Year
+                </label>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-blue-500 outline-none"
+                  className="w-full bg-gray-50 dark:bg-zinc-800 border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 rounded-2xl px-5 py-3.5 font-semibold text-gray-900 dark:text-white transition-all outline-none"
                 >
                   {years.map((year) => (
                     <option key={year} value={year}>{year}</option>
@@ -197,80 +244,165 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
 
       {/* Summary Stats */}
       {trips.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-blue-50 rounded-2xl p-4 text-center">
-            <p className="text-gray-600 text-sm font-semibold">Total Trips</p>
-            <p className="text-3xl font-bold text-blue-600 mt-1">{trips.length}</p>
-          </div>
-          <div className="bg-green-50 rounded-2xl p-4 text-center">
-            <p className="text-gray-600 text-sm font-semibold">Total Fare</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">${totalFare.toFixed(2)}</p>
-          </div>
-          <div className="bg-amber-50 rounded-2xl p-4 text-center">
-            <p className="text-gray-600 text-sm font-semibold">Avg Rating</p>
-            <p className="text-3xl font-bold text-amber-600 mt-1">{averageRating}</p>
-          </div>
+        <div className="grid grid-cols-3 gap-3">
+          {stats.map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              whileHover={{ y: -4 }}
+              className={`${stat.bgColor} p-4 rounded-[2rem] border border-gray-100/50 dark:border-zinc-800/50 shadow-sm hover:shadow-md transition-all duration-300 text-center`}
+            >
+              <div className={`w-10 h-10 bg-gradient-to-br ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg`}>
+                <stat.icon className="w-5 h-5 text-white" />
+              </div>
+              <p className="text-xl font-black text-gray-900 dark:text-white leading-tight">{stat.value}</p>
+              <p className="text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider mt-0.5">{stat.label}</p>
+            </motion.div>
+          ))}
         </div>
       )}
 
       {/* Export Button */}
-      <button
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
         onClick={exportToCSV}
         disabled={trips.length === 0 || isLoading}
-        className="w-full bg-blue-600 text-white py-3 rounded-2xl font-bold hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-2xl font-bold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-purple-500/25 transition-all flex items-center justify-center gap-3"
       >
-        <Download className="w-5 h-5" />
-        Export as CSV
-      </button>
+        {isLoading ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : (
+          <>
+            <FileText className="w-5 h-5" />
+            Export as CSV
+          </>
+        )}
+      </motion.button>
 
       {/* Trips List */}
       <div className="space-y-3">
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <div className="flex justify-center py-12">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              <Loader2 className="w-10 h-10 text-purple-600" />
+            </motion.div>
           </div>
         ) : trips.length === 0 ? (
-          <div className="text-center py-12">
-            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No trips found for {MONTHS[selectedMonth]} {selectedYear}</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-12 text-center border-2 border-dashed border-gray-200 dark:border-zinc-800"
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-800 dark:to-zinc-700 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <AlertCircle className="w-10 h-10 text-gray-400 dark:text-zinc-500" />
+            </div>
+            <p className="text-lg font-bold text-gray-900 dark:text-white">
+              No trips found
+            </p>
+            <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
+              for {MONTHS[selectedMonth]} {selectedYear}
+            </p>
+          </motion.div>
         ) : (
-          trips.map((trip) => {
+          trips.map((trip, index) => {
             const date = trip.completedAt?.toDate ? trip.completedAt.toDate() : new Date(trip.completedAt);
             const displayName = userRole === 'passenger' 
               ? (trip.riderId ? getUserName(trip.riderId) : 'Unknown Driver')
               : (trip.passengerId ? getUserName(trip.passengerId) : 'Unknown Passenger');
+            const avatarUrl = userRole === 'passenger' 
+              ? (trip.riderId ? getUserAvatar(trip.riderId) : null)
+              : (trip.passengerId ? getUserAvatar(trip.passengerId) : null);
               
             return (
               <motion.div
                 key={trip.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-gray-50 rounded-2xl p-4 border border-gray-200 hover:border-blue-300 transition-all"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.01, y: -2 }}
+                className="bg-white dark:bg-zinc-900 rounded-[2rem] p-5 border border-gray-100 dark:border-zinc-800 shadow-sm hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all cursor-pointer group"
               >
-                <div className="flex justify-between items-start mb-3">
+                <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-sm text-gray-500">{date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    {/* Date and Time */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 bg-purple-50 dark:bg-purple-500/10 rounded-xl flex items-center justify-center">
+                        <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">
+                          {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-zinc-400 font-semibold">
+                          {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold text-gray-800 mb-2">
-                      {userRole === 'passenger' ? '👨‍✈️ ' : '🧑 '}
-                      {displayName}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2 text-sm text-gray-700">
-                      <MapPin className="w-4 h-4 text-green-600" />
-                      <span>{trip.pickup.address}</span>
+
+                    {/* User Info */}
+                    <div className="flex items-center gap-3 mb-3">
+                      {avatarUrl ? (
+                        <img src={avatarUrl} className="w-10 h-10 rounded-2xl ring-2 ring-gray-100 dark:ring-zinc-800 object-cover" alt="" />
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl flex items-center justify-center ring-2 ring-gray-100 dark:ring-zinc-800">
+                          <Users className="w-5 h-5 text-white" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 dark:text-white">{displayName}</p>
+                        <p className="text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider">
+                          {userRole === 'passenger' ? 'Driver' : 'Passenger'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-sm text-gray-700">
-                      <MapPin className="w-4 h-4 text-red-600" />
-                      <span>{trip.destination.address}</span>
+
+                    {/* Locations */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-green-50 dark:bg-green-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-4 h-4 text-green-600" />
+                        </div>
+                        <span className="text-sm text-gray-600 dark:text-zinc-300 truncate group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                          {trip.pickup.address}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-red-50 dark:bg-red-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <MapPin className="w-4 h-4 text-red-600" />
+                        </div>
+                        <span className="text-sm text-gray-600 dark:text-zinc-300 truncate group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+                          {trip.destination.address}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-gray-900">${trip.fare || '0'}</p>
-                    {trip.riderRating && (
-                      <p className="text-sm text-amber-600 font-semibold mt-1">⭐ {trip.riderRating}</p>
-                    )}
+
+                  {/* Fare and Rating */}
+                  <div className="text-right ml-4">
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-800 dark:to-zinc-900 rounded-2xl p-4 shadow-sm">
+                      <p className="text-2xl font-black text-gray-900 dark:text-white">
+                        ${trip.fare || '0'}
+                      </p>
+                      {trip.discountAmount && trip.discountAmount > 0 && (
+                        <p className="text-xs text-emerald-500 font-bold line-through opacity-75">
+                          ${trip.fare + trip.discountAmount}
+                        </p>
+                      )}
+                      {trip.riderRating && (
+                        <div className="flex items-center gap-1 mt-2 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-xl">
+                          <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                          <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                            {trip.riderRating}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -278,6 +410,6 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
           })
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

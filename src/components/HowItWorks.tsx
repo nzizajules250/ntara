@@ -1,32 +1,9 @@
 import { useState } from 'react';
 import {
-  MapPin,
-  Phone,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Star,
-  CreditCard,
-  Navigation,
-  User as UserIcon,
-  Eye,
-  Heart,
-  Zap,
-  Shield,
-  ChevronDown,
-  ChevronUp,
-  Car,
-  Bike,
-  Smartphone,
-  Settings,
-  Users,
-  TrendingUp,
-  Award,
-  Bell,
-  DollarSign,
-  Map as MapIcon,
-  Headphones,
-  Accessibility,
+  MapPin, Phone, Clock, CheckCircle2, AlertCircle, Star, CreditCard, Navigation,
+  User as UserIcon, Eye, Heart, Zap, Shield, ChevronDown, ChevronUp, Car, Bike,
+  Smartphone, Settings, Users, TrendingUp, Award, Bell, DollarSign, Map as MapIcon,
+  Headphones, Accessibility, Sparkles, ArrowRight, BookOpen, Lightbulb, LifeBuoy,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
@@ -240,115 +217,35 @@ const HowItWorks = ({ profile }: Props) => {
 
   const features = {
     passenger: [
-      {
-        icon: MapPin,
-        title: t('realTimeTracking'),
-        description: t('seeDriverLocationRealtime'),
-      },
-      {
-        icon: Shield,
-        title: t('safeAndSecure'),
-        description: t('allDriversVerified'),
-      },
-      {
-        icon: CreditCard,
-        title: t('easyPayment'),
-        description: t('multiplePaymentOptions'),
-      },
-      {
-        icon: Users,
-        title: t('ratedDrivers'),
-        description: t('seeDriverRatings'),
-      },
-      {
-        icon: Clock,
-        title: t('saveTime'),
-        description: t('noNeedToCall'),
-      },
-      {
-        icon: Smartphone,
-        title: t('inAppChat'),
-        description: t('communicateWithDriver'),
-      },
+      { icon: MapPin, title: t('realTimeTracking'), description: t('seeDriverLocationRealtime') },
+      { icon: Shield, title: t('safeAndSecure'), description: t('allDriversVerified') },
+      { icon: CreditCard, title: t('easyPayment'), description: t('multiplePaymentOptions') },
+      { icon: Users, title: t('ratedDrivers'), description: t('seeDriverRatings') },
+      { icon: Clock, title: t('saveTime'), description: t('noNeedToCall') },
+      { icon: Smartphone, title: t('inAppChat'), description: t('communicateWithDriver') },
     ],
     rider: [
-      {
-        icon: TrendingUp,
-        title: t('flexibleEarnings'),
-        description: t('workOwnSchedule'),
-      },
-      {
-        icon: MapIcon,
-        title: t('smartRouting'),
-        description: t('optimizedRoutesEfficiency'),
-      },
-      {
-        icon: Award,
-        title: t('performanceRewards'),
-        description: t('earnBonusesAchievements'),
-      },
-      {
-        icon: Bell,
-        title: t('realTimeRideRequests'),
-        description: t('seeRequestsRealtime'),
-      },
-      {
-        icon: Shield,
-        title: t('driverProtection'),
-        description: t('insuranceCoverageSupport'),
-      },
-      {
-        icon: Headphones,
-        title: t('supportTeamAvailable'),
-        description: t('helpAlwaysAvailable'),
-      },
+      { icon: TrendingUp, title: t('flexibleEarnings'), description: t('workOwnSchedule') },
+      { icon: MapIcon, title: t('smartRouting'), description: t('optimizedRoutesEfficiency') },
+      { icon: Award, title: t('performanceRewards'), description: t('earnBonusesAchievements') },
+      { icon: Bell, title: t('realTimeRideRequests'), description: t('seeRequestsRealtime') },
+      { icon: Shield, title: t('driverProtection'), description: t('insuranceCoverageSupport') },
+      { icon: Headphones, title: t('supportTeamAvailable'), description: t('helpAlwaysAvailable') },
     ],
   };
 
   const tips = {
     passenger: [
-      {
-        title: t('setAccurateLocation'),
-        description: t('accurateLocationTip'),
-        icon: MapPin,
-      },
-      {
-        title: t('beReadyOnTime'),
-        description: t('beReadyTip'),
-        icon: Clock,
-      },
-      {
-        title: t('addEmergencyContacts'),
-        description: t('emergencyContactsTip'),
-        icon: Heart,
-      },
-      {
-        title: t('rateHonestly'),
-        description: t('rateHonestlyTip'),
-        icon: Star,
-      },
+      { title: t('setAccurateLocation'), description: t('accurateLocationTip'), icon: MapPin },
+      { title: t('beReadyOnTime'), description: t('beReadyTip'), icon: Clock },
+      { title: t('addEmergencyContacts'), description: t('emergencyContactsTip'), icon: Heart },
+      { title: t('rateHonestly'), description: t('rateHonestlyTip'), icon: Star },
     ],
     rider: [
-      {
-        title: t('keepProfileUpdated'),
-        description: t('profileUpdateTip'),
-        icon: UserIcon,
-      },
-      {
-        title: t('maintainHighRating'),
-        description: t('professionalServiceTip'),
-        icon: Award,
-      },
-      {
-        title: t('knowTheArea'),
-        description: t('familiarityTip'),
-        icon: MapIcon,
-      },
-      {
-        title: t('communicateWell'),
-        description: t('communicationTip'),
-        icon: Headphones,
-      },
+      { title: t('keepProfileUpdated'), description: t('profileUpdateTip'), icon: UserIcon },
+      { title: t('maintainHighRating'), description: t('professionalServiceTip'), icon: Award },
+      { title: t('knowTheArea'), description: t('familiarityTip'), icon: MapIcon },
+      { title: t('communicateWell'), description: t('communicationTip'), icon: Headphones },
     ],
   };
 
@@ -358,56 +255,56 @@ const HowItWorks = ({ profile }: Props) => {
   const userTips = isPassengerGuide ? tips.passenger : tips.rider;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-950 dark:to-zinc-900 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-10"
         >
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Accessibility className="w-8 h-8 text-emerald-500" />
-            <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white">
-              {isPassengerGuide ? t('howToRequestRide') : t('howToEarnWithSwiftRide')}
-            </h1>
+          <div className="relative inline-block mb-6">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-[2rem] blur-2xl opacity-20" />
+            <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-purple-500/30">
+              <BookOpen className="w-10 h-10 text-white" />
+            </div>
           </div>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+          <h1 className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white mb-3">
+            {isPassengerGuide ? t('howToRequestRide') : t('howToEarnWithSwiftRide')}
+          </h1>
+          <p className="text-lg text-gray-500 dark:text-zinc-400 max-w-2xl mx-auto font-semibold">
             {isPassengerGuide ? t('followSteps') : t('startEarning')}
           </p>
         </motion.div>
 
+        {/* Guide Switcher */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="mb-12"
+          className="mb-10"
         >
-          <p className="mb-4 text-center text-xs font-black uppercase tracking-[0.24em] text-gray-400 dark:text-zinc-500">
+          <p className="mb-3 text-center text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-zinc-500">
             {t('switchGuide')}
           </p>
-          <div className="mx-auto flex w-full max-w-md rounded-2xl border border-gray-200 bg-white p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
+          <div className="mx-auto flex w-full max-w-md rounded-2xl bg-gray-100 dark:bg-zinc-800 p-1.5">
             {[
               { value: 'passenger' as const, label: t('passenger'), icon: Users },
               { value: 'driver' as const, label: t('driver'), icon: Car },
             ].map(({ value, label, icon: Icon }) => (
-              <button
+              <motion.button
                 key={value}
-                onClick={() => {
-                  setExpandedSection(null);
-                  setSelectedGuide(value);
-                }}
-                className={`flex-1 rounded-xl px-4 py-3 font-semibold transition-all ${
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { setExpandedSection(null); setSelectedGuide(value); }}
+                className={`flex-1 rounded-xl px-4 py-3 font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                   selectedGuide === value
-                    ? 'bg-emerald-500 text-white shadow-lg'
-                    : 'text-gray-700 dark:text-gray-300'
+                    ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-lg'
+                    : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
                 }`}
               >
-                <span className="flex items-center justify-center gap-2">
-                  <Icon className="h-5 w-5" />
-                  {label}
-                </span>
-              </button>
+                <Icon className="h-5 w-5" />
+                {label}
+              </motion.button>
             ))}
           </div>
         </motion.div>
@@ -416,8 +313,8 @@ const HowItWorks = ({ profile }: Props) => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, staggerChildren: 0.1 }}
-          className="space-y-4 mb-16"
+          transition={{ delay: 0.2 }}
+          className="space-y-3 mb-16"
         >
           {steps.map((step, index) => {
             const Icon = step.icon;
@@ -429,37 +326,38 @@ const HowItWorks = ({ profile }: Props) => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="group"
               >
                 <button
                   onClick={() => setExpandedSection(isExpanded ? null : step.id)}
-                  className="w-full"
+                  className="w-full text-left"
                 >
-                  <div className="bg-white dark:bg-zinc-800 rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100 dark:border-zinc-700">
+                  <div className={`bg-white dark:bg-zinc-900 rounded-[2rem] p-5 shadow-sm hover:shadow-md transition-all border ${
+                    isExpanded 
+                      ? 'border-purple-300 dark:border-purple-700 ring-2 ring-purple-500/10 shadow-lg' 
+                      : 'border-gray-100 dark:border-zinc-800'
+                  }`}>
                     <div className="flex items-start gap-4">
-                      {/* Step Number Circle */}
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center text-white font-bold text-lg`}>
+                      {/* Step Number */}
+                      <div className={`flex-shrink-0 w-12 h-12 bg-gradient-to-br ${step.color} rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg`}>
                         {index + 1}
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Icon className={`w-5 h-5 text-gray-600 dark:text-gray-400`} />
-                          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className="w-5 h-5 text-gray-400 dark:text-zinc-500" />
+                          <h3 className="text-lg font-black text-gray-900 dark:text-white">
                             {step.title}
                           </h3>
                         </div>
-                        <p className="text-gray-600 dark:text-gray-400">{step.description}</p>
+                        <p className="text-sm text-gray-500 dark:text-zinc-400 font-semibold">{step.description}</p>
                       </div>
 
                       {/* Expand Icon */}
-                      <div className="flex-shrink-0">
-                        {isExpanded ? (
-                          <ChevronUp className="w-6 h-6 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="w-6 h-6 text-gray-400" />
-                        )}
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                        isExpanded ? 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'bg-gray-100 dark:bg-zinc-800 text-gray-400'
+                      }`}>
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
                     </div>
 
@@ -471,21 +369,21 @@ const HowItWorks = ({ profile }: Props) => {
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.3 }}
-                          className="mt-6 pt-6 border-t border-gray-100 dark:border-zinc-700"
+                          className="mt-5 pt-5 border-t border-gray-100 dark:border-zinc-800"
                         >
-                          <ul className="space-y-3">
+                          <ul className="space-y-2.5">
                             {step.details.map((detail, i) => (
                               <motion.li
                                 key={i}
-                                initial={{ opacity: 0, x: -20 }}
+                                initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.1 }}
+                                transition={{ delay: i * 0.05 }}
                                 className="flex items-start gap-3"
                               >
-                                <div className={`flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br ${step.color} flex items-center justify-center mt-0.5`}>
-                                  <CheckCircle2 className="w-4 h-4 text-white" />
+                                <div className={`flex-shrink-0 w-6 h-6 bg-gradient-to-br ${step.color} rounded-lg flex items-center justify-center mt-0.5`}>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                                 </div>
-                                <span className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                <span className="text-sm text-gray-600 dark:text-zinc-300 leading-relaxed font-semibold">
                                   {detail}
                                 </span>
                               </motion.li>
@@ -508,10 +406,16 @@ const HowItWorks = ({ profile }: Props) => {
           transition={{ delay: 0.4 }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
-            {isPassengerGuide ? t('whyChooseSwiftRide') : t('whyDriveWithSwiftRide')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider mb-4">
+              <Sparkles className="w-4 h-4" />
+              Features
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white">
+              {isPassengerGuide ? t('whyChooseSwiftRide') : t('whyDriveWithSwiftRide')}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {userFeatures.map((feature, index) => {
               const Icon = feature.icon;
               return (
@@ -520,38 +424,37 @@ const HowItWorks = ({ profile }: Props) => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.05 }}
-                  className="bg-white dark:bg-zinc-800 rounded-2xl p-6 shadow-md hover:shadow-lg transition-all hover:scale-105 border border-gray-100 dark:border-zinc-700"
+                  whileHover={{ y: -4 }}
+                  className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 shadow-sm hover:shadow-lg transition-all border border-gray-100 dark:border-zinc-800"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white mb-2">
-                        {feature.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {feature.description}
-                      </p>
-                    </div>
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-500/10 dark:to-indigo-500/10 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                    <Icon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                   </div>
+                  <h3 className="font-black text-gray-900 dark:text-white mb-2">{feature.title}</h3>
+                  <p className="text-sm text-gray-500 dark:text-zinc-400 font-semibold leading-relaxed">{feature.description}</p>
                 </motion.div>
               );
             })}
           </div>
         </motion.div>
 
-        {/* Tips & Best Practices */}
+        {/* Tips Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="mb-16"
         >
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
-            {t('tipsAndBestPractices')}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider mb-4">
+              <Lightbulb className="w-4 h-4" />
+              Pro Tips
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white">
+              {t('tipsAndBestPractices')}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {userTips.map((tip, index) => {
               const Icon = tip.icon;
               return (
@@ -560,19 +463,16 @@ const HowItWorks = ({ profile }: Props) => {
                   initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
-                  className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl p-6 border border-emerald-200 dark:border-emerald-800"
+                  whileHover={{ y: -2 }}
+                  className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/5 dark:to-yellow-500/5 rounded-[2rem] p-6 border border-amber-200 dark:border-amber-500/20"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="w-10 h-10 bg-amber-100 dark:bg-amber-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white mb-2">
-                        {tip.title}
-                      </h3>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                        {tip.description}
-                      </p>
+                      <h3 className="font-black text-gray-900 dark:text-white mb-1">{tip.title}</h3>
+                      <p className="text-sm text-gray-600 dark:text-zinc-300 font-semibold leading-relaxed">{tip.description}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -586,35 +486,35 @@ const HowItWorks = ({ profile }: Props) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-8 border border-blue-200 dark:border-blue-800"
+          className="mb-16"
         >
-          <div className="flex items-start gap-4 mb-6">
-            <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                {t('safetyAndSupport')}
-              </h3>
-              <p className="text-gray-700 dark:text-gray-300 mb-4">
-                {t('yourSafetyPriority')}
-              </p>
-              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  {t('emergencySupport24_7')}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  {t('tripInsuranceCoverage')}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  {t('realtimeLocationSharing')}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  {t('userVerificationChecks')}
-                </li>
-              </ul>
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-500/5 dark:to-indigo-500/5 rounded-[2.5rem] p-8 border border-blue-200 dark:border-blue-500/20">
+            <div className="flex items-start gap-5">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xl shadow-blue-500/25">
+                <Shield className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">{t('safetyAndSupport')}</h3>
+                <p className="text-gray-600 dark:text-zinc-300 mb-5 font-semibold">{t('yourSafetyPriority')}</p>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-3 text-sm text-gray-700 dark:text-zinc-200 font-semibold">
+                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    {t('emergencySupport24_7')}
+                  </li>
+                  <li className="flex items-center gap-3 text-sm text-gray-700 dark:text-zinc-200 font-semibold">
+                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    {t('tripInsuranceCoverage')}
+                  </li>
+                  <li className="flex items-center gap-3 text-sm text-gray-700 dark:text-zinc-200 font-semibold">
+                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    {t('realtimeLocationSharing')}
+                  </li>
+                  <li className="flex items-center gap-3 text-sm text-gray-700 dark:text-zinc-200 font-semibold">
+                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    {t('userVerificationChecks')}
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -624,22 +524,40 @@ const HowItWorks = ({ profile }: Props) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="mt-12 text-center"
+          className="text-center"
         >
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl p-8 border border-gray-100 dark:border-zinc-700">
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              {t('readyToGetStarted')}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {isPassengerGuide ? t('requestFirstRide') : t('startEarningToday')}
-            </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <button className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl transition-colors">
-                {isPassengerGuide ? t('requestARide') : t('becomeADriver')}
-              </button>
-              <button className="px-8 py-3 bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-900 dark:text-white font-bold rounded-xl transition-colors">
-                {t('needHelp')}
-              </button>
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-purple-600 to-indigo-700 dark:from-purple-900 dark:via-purple-900 dark:to-indigo-950 rounded-[3rem] p-10 shadow-2xl shadow-purple-500/20">
+            <div className="absolute inset-0 opacity-20">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+            </div>
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full mb-6">
+                <Zap className="w-4 h-4 text-white" />
+                <span className="text-xs font-black text-white uppercase tracking-wider">Get Started Today</span>
+              </div>
+              <h3 className="text-3xl font-black text-white mb-3">{t('readyToGetStarted')}</h3>
+              <p className="text-white/70 font-semibold mb-8 max-w-md mx-auto">
+                {isPassengerGuide ? t('requestFirstRide') : t('startEarningToday')}
+              </p>
+              <div className="flex gap-3 justify-center flex-wrap">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-white text-purple-700 font-black rounded-2xl shadow-xl shadow-black/10 hover:bg-gray-50 transition-all flex items-center gap-2"
+                >
+                  {isPassengerGuide ? t('requestARide') : t('becomeADriver')}
+                  <ArrowRight className="w-5 h-5" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-white/20 backdrop-blur-sm text-white font-bold rounded-2xl hover:bg-white/30 transition-all flex items-center gap-2"
+                >
+                  <LifeBuoy className="w-5 h-5" />
+                  {t('needHelp')}
+                </motion.button>
+              </div>
             </div>
           </div>
         </motion.div>

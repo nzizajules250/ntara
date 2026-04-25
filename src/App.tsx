@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { auth, getUserProfile, UserProfile, subscribeToUserProfile } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle } from 'lucide-react';
+import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PassengerDashboard from './components/PassengerDashboard';
 import RiderDashboard from './components/RiderDashboard';
@@ -34,10 +34,7 @@ function AppContent() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-
+    if (typeof window === 'undefined') return false;
     const savedLanguage = localStorage.getItem('language');
     return savedLanguage ? localStorage.getItem(`welcome_seen_${savedLanguage}`) !== 'true' : false;
   });
@@ -53,27 +50,20 @@ function AppContent() {
     }
   }, [isDark]);
 
-  // PWA Install Prompt Handler
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallPrompt(true);
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallApp = async () => {
     if (!deferredPrompt) return;
-
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
       setShowInstallPrompt(false);
@@ -82,28 +72,20 @@ function AppContent() {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        // Initial fetch
         const p = await getUserProfile(user.uid);
         setProfile(p);
-        
-        // Subscription for real-time updates (e.g. after editing profile)
         unsubscribeProfile = subscribeToUserProfile(user.uid, (updatedProfile) => {
           setProfile(updatedProfile);
         });
       } else {
         setProfile(null);
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = null;
-        }
+        if (unsubscribeProfile) { unsubscribeProfile(); unsubscribeProfile = null; }
       }
       setLoading(false);
     });
-
     return () => {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
@@ -111,79 +93,73 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!language) {
-      setShowWelcome(false);
-      return;
-    }
-
+    if (!language) { setShowWelcome(false); return; }
     setShowWelcome(localStorage.getItem(`welcome_seen_${language}`) !== 'true');
   }, [language]);
 
   const handleWelcomeContinue = () => {
-    if (language) {
-      localStorage.setItem(`welcome_seen_${language}`, 'true');
-    }
+    if (language) localStorage.setItem(`welcome_seen_${language}`, 'true');
     setShowWelcome(false);
   };
 
-  if (!language) {
-    return <LanguageSelector />;
-  }
-
-  if (showWelcome) {
-    return <WelcomeScreen onContinue={handleWelcomeContinue} />;
-  }
+  if (!language) return <LanguageSelector />;
+  if (showWelcome) return <WelcomeScreen onContinue={handleWelcomeContinue} />;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-950 dark:to-zinc-900 flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-2xl"
+        >
+          <Loader2 className="w-7 h-7 text-white animate-spin" />
+        </motion.div>
       </div>
     );
   }
 
-  if (!user || !profile) {
-    return <Auth onAuthSuccess={(p) => setProfile(p)} />;
-  }
+  if (!user || !profile) return <Auth onAuthSuccess={(p) => setProfile(p)} />;
 
   return (
     <NotificationProvider>
-      <div className="min-h-screen pb-20 lg:pb-0 font-sans transition-colors duration-300">
+      <div className="min-h-screen pb-20 lg:pb-0 font-sans transition-colors duration-300 bg-[#F5F5F5] dark:bg-zinc-950">
         {/* PWA Install Prompt */}
         <AnimatePresence>
           {showInstallPrompt && deferredPrompt && (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="fixed top-4 left-4 right-4 z-[100] bg-black text-white rounded-2xl shadow-2xl p-4 sm:max-w-md sm:left-auto sm:right-4"
+              initial={{ opacity: 0, y: -50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -50, scale: 0.95 }}
+              className="fixed top-4 left-4 right-4 z-[100] bg-gradient-to-br from-gray-900 to-black dark:from-zinc-800 dark:to-zinc-900 text-white rounded-[2rem] shadow-2xl p-5 sm:max-w-md sm:left-auto sm:right-4 border border-white/10"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Download className="w-5 h-5 text-emerald-400" />
-                    <p className="font-bold text-sm uppercase tracking-widest">Install  Ntwara</p>
+                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <Download className="w-4 h-4 text-white" />
+                    </div>
+                    <p className="font-black text-sm uppercase tracking-wider">Install Ntwara</p>
                   </div>
-                  <p className="text-xs text-gray-300 mb-4">Install our app for faster access  Works great on mobile!</p>
+                  <p className="text-xs text-gray-400 mb-4 font-medium">Install our app for faster access. Works great on mobile!</p>
                   <div className="flex gap-2">
-                    <button
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
                       onClick={handleInstallApp}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-bold py-2 px-4 rounded-xl transition-colors text-sm"
+                      className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold py-2.5 px-4 rounded-xl transition-all text-sm shadow-lg shadow-emerald-500/25"
                     >
                       Install Now
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => setShowInstallPrompt(false)}
-                      className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-sm font-bold"
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-sm font-bold"
                     >
                       Later
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowInstallPrompt(false)}
-                  className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
-                >
+                <button onClick={() => setShowInstallPrompt(false)} className="text-gray-500 hover:text-white transition-colors flex-shrink-0 p-1">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -191,98 +167,78 @@ function AppContent() {
           )}
         </AnimatePresence>
 
-        <nav className="bg-white dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-50">
+        {/* Top Navigation */}
+        <nav className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
-            <button
-              onClick={() => setView('dashboard')}
-              className="flex items-center transition-transform hover:scale-[1.02] active:scale-[0.99]"
-            >
-              <img
-                src="/ntwara-logo.png"
-                alt="Ntwara"
-                className="h-12 sm:h-14 w-auto object-contain"
-              />
+            <button onClick={() => setView('dashboard')} className="flex items-center transition-transform hover:scale-[1.02] active:scale-[0.99]">
+              <img src="/ntwara-logo.png" alt="Ntwara" className="h-12 sm:h-14 w-auto object-contain" />
             </button>
 
-            <div className="flex items-center gap-1 sm:gap-4">
-              <button 
+            <div className="flex items-center gap-2 sm:gap-3">
+              <motion.button 
+                whileTap={{ scale: 0.9 }}
                 onClick={() => setIsDark(!isDark)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-gray-500 dark:text-gray-400"
+                className="p-2.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-gray-500 dark:text-gray-400"
               >
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
+              </motion.button>
 
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold dark:text-white">{profile.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{t(profile.role as any)}</p>
+                <p className="text-sm font-bold dark:text-white">{profile.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize font-semibold">{t(profile.role as any)}</p>
               </div>
-              <button 
+              <motion.button 
+                whileTap={{ scale: 0.9 }}
                 onClick={() => setView('profile')}
-                className={`transition-all active:scale-95 ${view === 'profile' ? 'ring-2 ring-black dark:ring-white ring-offset-2 dark:ring-offset-zinc-900 rounded-full' : ''}`}
+                className={`transition-all ${view === 'profile' ? 'ring-2 ring-purple-500 ring-offset-2 dark:ring-offset-zinc-900 rounded-full' : ''}`}
               >
                 {profile.avatarUrl ? (
-                  <img 
-                    src={profile.avatarUrl} 
-                    alt={profile.name} 
-                    referrerPolicy="no-referrer" 
-                    className="w-8 sm:w-9 h-8 sm:h-9 rounded-full object-cover border border-gray-100 dark:border-zinc-800 shadow-sm" 
-                  />
+                  <img src={profile.avatarUrl} alt={profile.name} referrerPolicy="no-referrer" className="w-9 h-9 rounded-full object-cover ring-2 ring-gray-100 dark:ring-zinc-800 shadow-sm" />
                 ) : (
-                  <div className={`p-2 rounded-full transition-colors ${view === 'profile' ? 'bg-black dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
+                  <div className={`p-2 rounded-full transition-all ${view === 'profile' ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
                     <UserIcon className="w-5 h-5" />
                   </div>
                 )}
-              </button>
+              </motion.button>
             </div>
           </div>
         </nav>
 
+        {/* Desktop Navigation */}
         <div className="hidden lg:block max-w-4xl mx-auto px-6 pt-5">
-          <div className="flex items-center justify-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-xl shadow-black/10 backdrop-blur-xl">
-            <button 
-              onClick={() => setView('dashboard')}
-              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'dashboard' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-            >
-              <Smartphone className="w-5 h-5" />
-              <span>{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
-            </button>
-            <button 
-              onClick={() => setView('history')}
-              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'history' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-            >
-              <History className="w-5 h-5" />
-              <span>{t('history')}</span>
-            </button>
-            <button 
-              onClick={() => setView('how-it-works')}
-              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'how-it-works' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-            >
-              <HelpCircle className="w-5 h-5" />
-              <span>{t('guide')}</span>
-            </button>
-            <button 
-              onClick={() => setView('profile')}
-              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'profile' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
-            >
-              {profile.avatarUrl ? (
-                <img src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" className={`h-5 w-5 rounded-full object-cover transition-all ${view === 'profile' ? 'ring-1 ring-zinc-950' : 'ring-1 ring-transparent'}`} />
-              ) : (
-                <UserIcon className="w-5 h-5" />
-              )}
-              <span>{t('profile')}</span>
-            </button>
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-white dark:bg-zinc-900 p-1.5 shadow-sm border border-gray-100 dark:border-zinc-800">
+            {[
+              { key: 'dashboard' as const, icon: Smartphone, label: profile.role === 'passenger' ? t('passenger') : t('rider') },
+              { key: 'history' as const, icon: History, label: t('history') },
+              { key: 'how-it-works' as const, icon: HelpCircle, label: t('guide') },
+              { key: 'profile' as const, icon: profile.avatarUrl ? null : UserIcon, label: t('profile'), avatar: profile.avatarUrl }
+            ].map((tab) => (
+              <motion.button
+                key={tab.key}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setView(tab.key)}
+                className={`flex-1 py-3 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all ${
+                  view === tab.key
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-xl shadow-purple-500/25'
+                    : 'text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 hover:text-gray-700 dark:hover:text-zinc-300'
+                }`}
+              >
+                {tab.avatar ? (
+                  <img src={tab.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                ) : tab.icon && (
+                  <tab.icon className="w-5 h-5" />
+                )}
+                <span className="text-xs uppercase tracking-wider">{tab.label}</span>
+              </motion.button>
+            ))}
           </div>
         </div>
 
+        {/* Main Content */}
         <main className="max-w-4xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pt-5 lg:pb-10">
           <AnimatePresence mode="wait">
             {view === 'dashboard' ? (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-              >
+              <motion.div key="dashboard" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}>
                 {profile.role === 'passenger' ? (
                   <PassengerDashboard user={user} profile={profile} />
                 ) : (
@@ -290,30 +246,15 @@ function AppContent() {
                 )}
               </motion.div>
             ) : view === 'history' ? (
-              <motion.div
-                key="history"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-              >
+              <motion.div key="history" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}>
                 <RideHistory user={user} profile={profile} />
               </motion.div>
             ) : view === 'how-it-works' ? (
-              <motion.div
-                key="how-it-works"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-              >
+              <motion.div key="how-it-works" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
                 <HowItWorks profile={profile} />
               </motion.div>
             ) : (
-              <motion.div
-                key="profile"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-              >
+              <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
                 <ProfileView profile={profile} />
               </motion.div>
             )}
@@ -321,39 +262,32 @@ function AppContent() {
         </main>
 
         {/* Mobile Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 z-40">
+        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-t border-gray-200 dark:border-zinc-800 z-40">
           <div className="flex items-center justify-around h-16 px-2">
-            <button 
-              onClick={() => setView('dashboard')}
-              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <Smartphone className="w-6 h-6" />
-              <span className="text-[10px] font-bold mt-1">{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
-            </button>
-            <button 
-              onClick={() => setView('history')}
-              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'history' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <History className="w-6 h-6" />
-              <span className="text-[10px] font-bold mt-1">{t('history')}</span>
-            </button>
-            <button 
-              onClick={() => setView('how-it-works')}
-              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'how-it-works' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <HelpCircle className="w-6 h-6" />
-              <span className="text-[10px] font-bold mt-1">{t('guide')}</span>
-            </button>
-            <button 
-              onClick={() => setView('profile')}
-              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'profile' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-            >
-              <UserIcon className="w-6 h-6" />
-              <span className="text-[10px] font-bold mt-1">{t('profile')}</span>
-            </button>
+            {[
+              { key: 'dashboard' as const, icon: Smartphone, label: profile.role === 'passenger' ? t('passenger') : t('rider') },
+              { key: 'history' as const, icon: History, label: t('history') },
+              { key: 'how-it-works' as const, icon: HelpCircle, label: t('guide') },
+              { key: 'profile' as const, icon: UserIcon, label: t('profile') }
+            ].map((tab) => (
+              <motion.button
+                key={tab.key}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setView(tab.key)}
+                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
+                  view === tab.key 
+                    ? 'text-purple-600 dark:text-purple-400' 
+                    : 'text-gray-400 dark:text-zinc-500'
+                }`}
+              >
+                <tab.icon className={`w-6 h-6 ${view === tab.key ? 'drop-shadow-lg' : ''}`} />
+                <span className={`text-[10px] font-bold mt-1 uppercase tracking-wider ${view === tab.key ? 'text-purple-600 dark:text-purple-400' : ''}`}>
+                  {tab.label}
+                </span>
+              </motion.button>
+            ))}
           </div>
         </div>
-
       </div>
     </NotificationProvider>
   );
