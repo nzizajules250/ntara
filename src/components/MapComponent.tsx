@@ -617,6 +617,3 @@ export default function MapComponent({
     </div>
   );
 }
-
-// Import missing icons
-import { Star, Phone } from 'lucide-react';
