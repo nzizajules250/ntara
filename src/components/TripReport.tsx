@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { Ride, db } from '../lib/firebase';
+import { Ride, db, getUserProfile, UserProfile } from '../lib/firebase';
 import { Download, Calendar, Filter, Loader2, AlertCircle, MapPin, Clock, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
@@ -23,6 +23,7 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [trips, setTrips] = useState<Ride[]>([]);
+  const [userProfiles, setUserProfiles] = useState<{ [key: string]: UserProfile }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -60,11 +61,41 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ride));
       setTrips(data);
+
+      // Fetch user profiles for all unique user IDs
+      const userIds = new Set<string>();
+      data.forEach(trip => {
+        if (trip.passengerId) userIds.add(trip.passengerId);
+        if (trip.riderId) userIds.add(trip.riderId);
+      });
+
+      const profiles: { [key: string]: UserProfile } = {};
+      await Promise.all(
+        Array.from(userIds).map(async (uid) => {
+          try {
+            const profile = await getUserProfile(uid);
+            if (profile) {
+              profiles[uid] = profile;
+            }
+          } catch (error) {
+            console.error(`Error fetching profile for ${uid}:`, error);
+          }
+        })
+      );
+      setUserProfiles(profiles);
     } catch (error) {
       console.error('Error loading trips:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getUserName = (uid: string): string => {
+    const profile = userProfiles[uid];
+    if (profile?.name) return profile.name;
+    if (profile?.firstName && profile?.lastName) return `${profile.firstName} ${profile.lastName}`;
+    if (profile?.firstName) return profile.firstName;
+    return uid; // Fallback to ID if no name found
   };
 
   const exportToCSV = () => {
@@ -76,7 +107,9 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
       const date = trip.completedAt?.toDate ? trip.completedAt.toDate() : new Date(trip.completedAt);
       return [
         date.toLocaleDateString(),
-        userRole === 'passenger' ? trip.riderId || 'Unknown' : trip.passengerId,
+        userRole === 'passenger' 
+          ? (trip.riderId ? getUserName(trip.riderId) : 'Unknown')
+          : (trip.passengerId ? getUserName(trip.passengerId) : 'Unknown'),
         trip.pickup.address,
         trip.destination.address,
         trip.fare || '0',
@@ -204,6 +237,10 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
         ) : (
           trips.map((trip) => {
             const date = trip.completedAt?.toDate ? trip.completedAt.toDate() : new Date(trip.completedAt);
+            const displayName = userRole === 'passenger' 
+              ? (trip.riderId ? getUserName(trip.riderId) : 'Unknown Driver')
+              : (trip.passengerId ? getUserName(trip.passengerId) : 'Unknown Passenger');
+              
             return (
               <motion.div
                 key={trip.id}
@@ -213,7 +250,13 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
               >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
-                    <p className="text-sm text-gray-500">{date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-sm text-gray-500">{date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 mb-2">
+                      {userRole === 'passenger' ? '👨‍✈️ ' : '🧑 '}
+                      {displayName}
+                    </p>
                     <div className="flex items-center gap-2 mt-2 text-sm text-gray-700">
                       <MapPin className="w-4 h-4 text-green-600" />
                       <span>{trip.pickup.address}</span>
