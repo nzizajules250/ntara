@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { auth, getUserProfile, UserProfile, subscribeToUserProfile } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle, Settings } from 'lucide-react';
+import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PassengerDashboard from './components/PassengerDashboard';
 import RiderDashboard from './components/RiderDashboard';
@@ -25,16 +25,12 @@ function AppContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'history' | 'profile' | 'how-it-works'>('dashboard');
-  
-  // Dark mode - default to true
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
-      return saved === 'dark' || saved === null; // Default to dark
+      return localStorage.getItem('theme') === 'dark';
     }
-    return true;
+    return false;
   });
-  
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => {
@@ -46,7 +42,6 @@ function AppContent() {
     return savedLanguage ? localStorage.getItem(`welcome_seen_${savedLanguage}`) !== 'true' : false;
   });
 
-  // Apply dark mode
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDark) {
@@ -91,9 +86,11 @@ function AppContent() {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
+        // Initial fetch
         const p = await getUserProfile(user.uid);
         setProfile(p);
         
+        // Subscription for real-time updates (e.g. after editing profile)
         unsubscribeProfile = subscribeToUserProfile(user.uid, (updatedProfile) => {
           setProfile(updatedProfile);
         });
@@ -139,8 +136,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
       </div>
     );
   }
@@ -151,7 +148,7 @@ function AppContent() {
 
   return (
     <NotificationProvider>
-      <div className="min-h-screen pb-16 font-sans transition-colors duration-300">
+      <div className="min-h-screen pb-20 lg:pb-0 font-sans transition-colors duration-300">
         {/* PWA Install Prompt */}
         <AnimatePresence>
           {showInstallPrompt && deferredPrompt && (
@@ -159,19 +156,19 @@ function AppContent() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="fixed top-4 left-4 right-4 z-[100] bg-black/95 backdrop-blur-xl text-white rounded-2xl shadow-2xl p-4 sm:max-w-md sm:left-auto sm:right-4 border border-white/10"
+              className="fixed top-4 left-4 right-4 z-[100] bg-black text-white rounded-2xl shadow-2xl p-4 sm:max-w-md sm:left-auto sm:right-4"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Download className="w-5 h-5 text-orange-400" />
-                    <p className="font-bold text-sm uppercase tracking-widest">Install Ntwara</p>
+                    <Download className="w-5 h-5 text-emerald-400" />
+                    <p className="font-bold text-sm uppercase tracking-widest">Install  Ntwara</p>
                   </div>
-                  <p className="text-xs text-gray-300 mb-4">Install our app for faster access. Works great on mobile!</p>
+                  <p className="text-xs text-gray-300 mb-4">Install our app for faster access  Works great on mobile!</p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleInstallApp}
-                      className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm"
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black font-bold py-2 px-4 rounded-xl transition-colors text-sm"
                     >
                       Install Now
                     </button>
@@ -194,9 +191,8 @@ function AppContent() {
           )}
         </AnimatePresence>
 
-        {/* Header - Logo only, no theme toggle */}
-        <div className="bg-black/20 dark:bg-white/5 backdrop-blur-xl border-b border-white/10 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+        <nav className="bg-white dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
             <button
               onClick={() => setView('dashboard')}
               className="flex items-center transition-transform hover:scale-[1.02] active:scale-[0.99]"
@@ -204,42 +200,81 @@ function AppContent() {
               <img
                 src="/ntwara-logo.png"
                 alt="Ntwara"
-                className="h-10 sm:h-12 w-auto object-contain brightness-0 invert"
+                className="h-12 sm:h-14 w-auto object-contain"
               />
-              <span className="ml-2 text-xl font-bold text-white hidden sm:inline">Ntwara</span>
             </button>
 
-            {/* Profile button - theme toggle moved to profile */}
+            <div className="flex items-center gap-1 sm:gap-4">
+              <button 
+                onClick={() => setIsDark(!isDark)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-gray-500 dark:text-gray-400"
+              >
+                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-semibold dark:text-white">{profile.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{t(profile.role as any)}</p>
+              </div>
+              <button 
+                onClick={() => setView('profile')}
+                className={`transition-all active:scale-95 ${view === 'profile' ? 'ring-2 ring-black dark:ring-white ring-offset-2 dark:ring-offset-zinc-900 rounded-full' : ''}`}
+              >
+                {profile.avatarUrl ? (
+                  <img 
+                    src={profile.avatarUrl} 
+                    alt={profile.name} 
+                    referrerPolicy="no-referrer" 
+                    className="w-8 sm:w-9 h-8 sm:h-9 rounded-full object-cover border border-gray-100 dark:border-zinc-800 shadow-sm" 
+                  />
+                ) : (
+                  <div className={`p-2 rounded-full transition-colors ${view === 'profile' ? 'bg-black dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-zinc-800 text-gray-500 dark:text-gray-400'}`}>
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        <div className="hidden lg:block max-w-4xl mx-auto px-6 pt-5">
+          <div className="flex items-center justify-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-900/95 p-2 text-sm text-white shadow-xl shadow-black/10 backdrop-blur-xl">
+            <button 
+              onClick={() => setView('dashboard')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'dashboard' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <Smartphone className="w-5 h-5" />
+              <span>{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
+            </button>
+            <button 
+              onClick={() => setView('history')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'history' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <History className="w-5 h-5" />
+              <span>{t('history')}</span>
+            </button>
+            <button 
+              onClick={() => setView('how-it-works')}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'how-it-works' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
+            >
+              <HelpCircle className="w-5 h-5" />
+              <span>{t('guide')}</span>
+            </button>
             <button 
               onClick={() => setView('profile')}
-              className={`transition-all active:scale-95 ${
-                view === 'profile' 
-                  ? 'ring-2 ring-orange-500 ring-offset-2 ring-offset-black rounded-full' 
-                  : ''
-              }`}
+              className={`flex min-w-[9rem] items-center justify-center gap-2 rounded-full px-6 py-3 font-medium transition-all ${view === 'profile' ? 'bg-zinc-100 text-zinc-950 shadow-sm text-[11px] uppercase tracking-[0.24em]' : 'text-zinc-400 hover:bg-white/8 hover:text-white'}`}
             >
               {profile.avatarUrl ? (
-                <img 
-                  src={profile.avatarUrl} 
-                  alt={profile.name} 
-                  referrerPolicy="no-referrer" 
-                  className="w-8 sm:w-9 h-8 sm:h-9 rounded-full object-cover border border-white/20 shadow-sm" 
-                />
+                <img src={profile.avatarUrl} alt="" referrerPolicy="no-referrer" className={`h-5 w-5 rounded-full object-cover transition-all ${view === 'profile' ? 'ring-1 ring-zinc-950' : 'ring-1 ring-transparent'}`} />
               ) : (
-                <div className={`p-2 rounded-full transition-colors ${
-                  view === 'profile' 
-                    ? 'bg-orange-500 text-white' 
-                    : 'bg-white/10 text-white/70'
-                }`}>
-                  <UserIcon className="w-5 h-5" />
-                </div>
+                <UserIcon className="w-5 h-5" />
               )}
+              <span>{t('profile')}</span>
             </button>
           </div>
         </div>
 
-        {/* Main Content - With bottom padding for menu */}
-        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 pb-24 sm:pb-6">
+        <main className="max-w-4xl mx-auto p-3 pb-24 sm:p-6 sm:pb-28 lg:pt-5 lg:pb-10">
           <AnimatePresence mode="wait">
             {view === 'dashboard' ? (
               <motion.div
@@ -285,67 +320,40 @@ function AppContent() {
           </AnimatePresence>
         </main>
 
-        {/* Bottom Navigation Bar - Both Mobile and Desktop */}
-        <div className="fixed bottom-0 left-0 right-0 bg-black/80 dark:bg-black/90 backdrop-blur-xl border-t border-white/10 z-40 shadow-lg">
-          <div className="max-w-7xl mx-auto px-2 sm:px-4">
-            <div className="flex items-center justify-around h-16 sm:h-14">
-              <button 
-                onClick={() => setView('dashboard')}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
-                  view === 'dashboard' 
-                    ? 'text-orange-500' 
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span className="text-[10px] font-medium mt-1 sm:text-xs">
-                  {profile.role === 'passenger' ? t('passenger') : t('rider')}
-                </span>
-              </button>
-              
-              <button 
-                onClick={() => setView('history')}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
-                  view === 'history' 
-                    ? 'text-orange-500' 
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <History className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span className="text-[10px] font-medium mt-1 sm:text-xs">{t('history')}</span>
-              </button>
-              
-              <button 
-                onClick={() => setView('how-it-works')}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
-                  view === 'how-it-works' 
-                    ? 'text-orange-500' 
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span className="text-[10px] font-medium mt-1 sm:text-xs">{t('guide')}</span>
-              </button>
-              
-              <button 
-                onClick={() => setView('profile')}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
-                  view === 'profile' 
-                    ? 'text-orange-500' 
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span className="text-[10px] font-medium mt-1 sm:text-xs">{t('profile')}</span>
-              </button>
-            </div>
-            
-            {/* Home Indicator for iOS */}
-            <div className="pb-2 flex justify-center sm:hidden">
-              <div className="w-32 h-1 bg-white/20 rounded-full" />
-            </div>
+        {/* Mobile Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 z-40">
+          <div className="flex items-center justify-around h-16 px-2">
+            <button 
+              onClick={() => setView('dashboard')}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'dashboard' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <Smartphone className="w-6 h-6" />
+              <span className="text-[10px] font-bold mt-1">{profile.role === 'passenger' ? t('passenger') : t('rider')}</span>
+            </button>
+            <button 
+              onClick={() => setView('history')}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'history' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <History className="w-6 h-6" />
+              <span className="text-[10px] font-bold mt-1">{t('history')}</span>
+            </button>
+            <button 
+              onClick={() => setView('how-it-works')}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'how-it-works' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <HelpCircle className="w-6 h-6" />
+              <span className="text-[10px] font-bold mt-1">{t('guide')}</span>
+            </button>
+            <button 
+              onClick={() => setView('profile')}
+              className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all ${view === 'profile' ? 'bg-black/5 dark:bg-white/10 text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            >
+              <UserIcon className="w-6 h-6" />
+              <span className="text-[10px] font-bold mt-1">{t('profile')}</span>
+            </button>
           </div>
         </div>
+
       </div>
     </NotificationProvider>
   );
