@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
-import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike  } from 'lucide-react';
+import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike, BarChart3, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
 import { updateDoc, doc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
 import MapComponent from './MapComponent';
+import TripReport from './TripReport';
+import TripAnalytics from './TripAnalytics';
 
 interface Props {
   user: FirebaseUser;
@@ -22,6 +24,7 @@ const hasValidCoordinates = (point?: { lat: number; lng: number } | null) =>
 export default function PassengerDashboard({ user, profile }: Props) {
   const { t } = useLanguage();
   const { addNotification } = useNotifications();
+  const [viewMode, setViewMode] = useState<'ride' | 'reports' | 'analytics'>('ride');
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [vehicleType, setVehicleType] = useState<'car' | 'motorcycle'>('car');
@@ -976,10 +979,56 @@ export default function PassengerDashboard({ user, profile }: Props) {
     );
   }
 
+  // View mode selector for non-active rides
   return (
-    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-      {/* Main Content */}
-      <div className="flex-1 space-y-8">
+    <div className="flex flex-col gap-6">
+      {/* Tab Navigation */}
+      <div className="flex gap-3 rounded-2xl bg-gray-100 p-1">
+        <button
+          onClick={() => setViewMode('ride')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+            viewMode === 'ride'
+              ? 'bg-white text-gray-900 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <MapIcon className="w-5 h-5" />
+          <span className="hidden sm:inline">Request Ride</span>
+        </button>
+        <button
+          onClick={() => setViewMode('reports')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+            viewMode === 'reports'
+              ? 'bg-white text-gray-900 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <FileText className="w-5 h-5" />
+          <span className="hidden sm:inline">Reports</span>
+        </button>
+        <button
+          onClick={() => setViewMode('analytics')}
+          className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+            viewMode === 'analytics'
+              ? 'bg-white text-gray-900 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <BarChart3 className="w-5 h-5" />
+          <span className="hidden sm:inline">Analytics</span>
+        </button>
+      </div>
+
+      {/* Conditional Content Based on View Mode */}
+      <AnimatePresence mode="wait">
+        {viewMode === 'ride' && (
+          <motion.div
+            key="ride-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="w-full"
+          >
         <div>
           <h2 className="text-4xl font-bold tracking-tight mb-2 text-gray-900">{t('whereTo')}</h2>
           <p className="text-gray-500 font-medium">{t('requestRide')}</p>
@@ -1388,7 +1437,39 @@ export default function PassengerDashboard({ user, profile }: Props) {
           </div>
         )}
       </AnimatePresence>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Reports View */}
+      <AnimatePresence mode="wait">
+        {viewMode === 'reports' && (
+          <motion.div
+            key="reports-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="w-full"
+          >
+            <TripReport user={user} userRole="passenger" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Analytics View */}
+      <AnimatePresence mode="wait">
+        {viewMode === 'analytics' && (
+          <motion.div
+            key="analytics-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="w-full"
+          >
+            <TripAnalytics user={user} userRole="passenger" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
