@@ -20,37 +20,37 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
       icon: MapPinned,
       title: t('welcomeFeatureOneTitle'),
       description: t('welcomeFeatureOneBody'),
-      color: 'from-blue-500 to-cyan-500',
-      bgColor: 'bg-blue-50',
-      iconBg: 'bg-gradient-to-br from-blue-500 to-cyan-500',
+      color: 'from-arctic-medium to-arctic-light',
+      bgColor: 'bg-arctic-lightest',
+      iconBg: 'bg-gradient-to-br from-arctic-medium to-arctic-dark',
     },
     {
       icon: Radio,
       title: t('welcomeFeatureTwoTitle'),
       description: t('welcomeFeatureTwoBody'),
-      color: 'from-emerald-500 to-green-500',
-      bgColor: 'bg-emerald-50',
-      iconBg: 'bg-gradient-to-br from-emerald-500 to-green-500',
+      color: 'from-arctic-dark to-arctic-medium',
+      bgColor: 'bg-arctic-light',
+      iconBg: 'bg-gradient-to-br from-arctic-medium to-arctic-dark',
     },
     {
       icon: ShieldCheck,
       title: t('welcomeFeatureThreeTitle'),
       description: t('welcomeFeatureThreeBody'),
-      color: 'from-purple-500 to-indigo-500',
-      bgColor: 'bg-purple-50',
-      iconBg: 'bg-gradient-to-br from-purple-500 to-indigo-500',
+      color: 'from-arctic-medium to-arctic-dark',
+      bgColor: 'bg-arctic-lightest',
+      iconBg: 'bg-gradient-to-br from-arctic-dark to-arctic-medium',
     },
   ];
 
   const currentLanguage = language ? languageNames[language] : languageNames.en;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-arctic-dark via-arctic-medium to-arctic-dark text-white">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-cyan-500/20 rounded-full blur-[120px] animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[150px]" />
+        <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-arctic-medium/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-arctic-light/20 rounded-full blur-[120px] animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-arctic-light/10 rounded-full blur-[150px]" />
       </div>
 
       {/* Grid Pattern Overlay */}
@@ -95,7 +95,7 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
                 className="flex items-center justify-center sm:justify-start"
               >
                 <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-[2rem] blur-2xl opacity-30" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-arctic-medium to-arctic-light rounded-[2rem] blur-2xl opacity-30" />
                   <img
                     src="/ntwara-logo.png"
                     alt="Ntwara"
@@ -113,7 +113,7 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
               >
                 <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
                   {t('welcome')}
-                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400">
+                  <span className="block text-transparent bg-clip-text bg-gradient-to-r from-arctic-light via-arctic-medium to-arctic-dark">
                     {t('welcomeHighlight') || ''}
                   </span>
                 </h1>
@@ -129,7 +129,7 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
                 transition={{ delay: 0.6 }}
                 className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/5 to-white/10 p-6 shadow-xl backdrop-blur-sm"
               >
-                <div className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-cyan-300">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black uppercase tracking-[0.2em] text-arctic-light">
                   <BadgeCheck className="h-5 w-5" />
                   {t('welcomeSummaryTitle')}
                 </div>
@@ -171,9 +171,9 @@ export default function WelcomeScreen({ onContinue }: WelcomeScreenProps) {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={onContinue}
-                  className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 px-8 py-5 text-sm font-black uppercase tracking-[0.22em] text-white shadow-2xl shadow-purple-500/30 transition-all sm:w-auto sm:min-w-[16rem]"
+                  className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] bg-gradient-to-r from-arctic-medium via-arctic-dark to-arctic-dark px-8 py-5 text-sm font-black uppercase tracking-[0.22em] text-white shadow-2xl shadow-arctic-medium/30 transition-all sm:w-auto sm:min-w-[16rem]"
                 >
-                  <span className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="absolute inset-0 bg-gradient-to-r from-arctic-light via-arctic-medium to-arctic-dark opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <span className="relative z-10 flex items-center gap-3">
                     {t('continueButton')}
                     <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />

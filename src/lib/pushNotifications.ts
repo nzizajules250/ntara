@@ -2,6 +2,57 @@
  * Browser Push Notifications & Background Sync Helper
  */
 
+// Notification sounds
+const NOTIFICATION_SOUNDS = {
+  success: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj==',
+  error: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBg==',
+  ride_request: 'data:audio/wav;base64,UklGRpYHAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZIHAAAAAA==',
+  ride_accepted: 'data:audio/wav;base64,UklGRpYHAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YZIHAAAAAA=='
+};
+
+/**
+ * Play notification sound
+ */
+export function playNotificationSound(type: 'success' | 'error' | 'ride_request' | 'ride_accepted' = 'success'): void {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Create a simple beep sound
+    const now = audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Set frequency based on notification type
+    switch (type) {
+      case 'success':
+        oscillator.frequency.value = 800; // Higher pitch for success
+        break;
+      case 'error':
+        oscillator.frequency.value = 400; // Lower pitch for error
+        break;
+      case 'ride_request':
+        oscillator.frequency.value = 600; // Medium pitch for ride request
+        break;
+      case 'ride_accepted':
+        oscillator.frequency.value = 900; // High pitch for accepted
+        break;
+    }
+    
+    // Set gain envelope
+    gainNode.gain.setValueAtTime(0.3, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+    
+    // Play the sound
+    oscillator.start(now);
+    oscillator.stop(now + 0.5);
+  } catch (e) {
+    console.warn('Failed to play notification sound:', e);
+  }
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!("Notification" in window)) {
     console.warn("This browser does not support desktop notifications");
@@ -27,19 +78,46 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return false;
 }
 
-export function sendPushNotification(title: string, options?: NotificationOptions) {
-  if (!("Notification" in window)) return;
+export function sendPushNotification(
+  title: string,
+  options?: NotificationOptions & { sound?: boolean }
+): Notification | null {
+  if (!("Notification" in window)) return null;
   
   if (Notification.permission === "granted") {
     try {
-      new Notification(title, {
-        icon: '/favicon.ico', // Default icon if available
+      const notification = new Notification(title, {
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: 'swiftride-notification',
+        requireInteraction: true,
         ...options
       });
+
+      // Play sound if enabled
+      if (options?.sound !== false) {
+        playNotificationSound(title.includes('Request') ? 'ride_request' : 'success');
+      }
+
+      // Auto-close after 7 seconds if no interaction required
+      if (!options?.requireInteraction) {
+        setTimeout(() => {
+          try {
+            notification.close();
+          } catch (e) {
+            console.warn('Failed to close notification:', e);
+          }
+        }, 7000);
+      }
+
+      return notification;
     } catch (e) {
       console.error("Error sending notification", e);
+      return null;
     }
   }
+
+  return null;
 }
 
 /**
