@@ -6,13 +6,14 @@
 import { useState, useEffect } from 'react';
 import { auth, getUserProfile, UserProfile, subscribeToUserProfile } from './lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle, Sparkles } from 'lucide-react';
+import { Moon, Sun, LogOut, History, Smartphone, Loader2, User as UserIcon, Download, X, HelpCircle, Sparkles, Headphones } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import PassengerDashboard from './components/PassengerDashboard';
 import RiderDashboard from './components/RiderDashboard';
 import RideHistory from './components/RideHistory';
 import ProfileView from './components/ProfileView';
 import HowItWorks from './components/HowItWorks';
+import ContactPage from './components/ContactPage';
 import Auth from './components/Auth';
 import { NotificationProvider } from './components/NotificationCenter';
 import { LanguageProvider, useLanguage } from './lib/i18n';
@@ -24,7 +25,7 @@ function AppContent() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'dashboard' | 'history' | 'profile' | 'how-it-works'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'history' | 'profile' | 'how-it-works' | 'contact'>('dashboard');
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark';
@@ -211,6 +212,7 @@ function AppContent() {
               { key: 'dashboard' as const, icon: Smartphone, label: profile.role === 'passenger' ? t('passenger') : t('rider') },
               { key: 'history' as const, icon: History, label: t('history') },
               { key: 'how-it-works' as const, icon: HelpCircle, label: t('guide') },
+              { key: 'contact' as const, icon: Headphones, label: 'Contact' },
               { key: 'profile' as const, icon: profile.avatarUrl ? null : UserIcon, label: t('profile'), avatar: profile.avatarUrl }
             ].map((tab) => (
               <motion.button
@@ -253,6 +255,10 @@ function AppContent() {
               <motion.div key="how-it-works" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
                 <HowItWorks profile={profile} />
               </motion.div>
+            ) : view === 'contact' ? (
+              <motion.div key="contact" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
+                <ContactPage />
+              </motion.div>
             ) : (
               <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
                 <ProfileView profile={profile} />
@@ -261,27 +267,32 @@ function AppContent() {
           </AnimatePresence>
         </main>
 
-        {/* Mobile Bottom Navigation */}
+        {/* Mobile Bottom Navigation - 5 items with smaller spacing */}
         <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl border-t border-gray-200 dark:border-zinc-800 z-40">
-          <div className="flex items-center justify-around h-16 px-2">
+          <div className="flex items-center justify-around h-16 px-1">
             {[
               { key: 'dashboard' as const, icon: Smartphone, label: profile.role === 'passenger' ? t('passenger') : t('rider') },
               { key: 'history' as const, icon: History, label: t('history') },
               { key: 'how-it-works' as const, icon: HelpCircle, label: t('guide') },
-              { key: 'profile' as const, icon: UserIcon, label: t('profile') }
+              { key: 'contact' as const, icon: Headphones, label: 'Contact' },
+              { key: 'profile' as const, icon: profile.avatarUrl ? null : UserIcon, label: t('profile'), avatar: profile.avatarUrl }
             ].map((tab) => (
               <motion.button
                 key={tab.key}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setView(tab.key)}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl transition-all ${
+                className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all min-w-0 ${
                   view === tab.key 
                     ? 'text-purple-600 dark:text-purple-400' 
                     : 'text-gray-400 dark:text-zinc-500'
                 }`}
               >
-                <tab.icon className={`w-6 h-6 ${view === tab.key ? 'drop-shadow-lg' : ''}`} />
-                <span className={`text-[10px] font-bold mt-1 uppercase tracking-wider ${view === tab.key ? 'text-purple-600 dark:text-purple-400' : ''}`}>
+                {tab.avatar ? (
+                  <img src={tab.avatar} alt="" className={`w-6 h-6 rounded-full object-cover ${view === tab.key ? 'ring-2 ring-purple-500' : ''}`} />
+                ) : tab.icon && (
+                  <tab.icon className={`w-5 h-5 ${view === tab.key ? 'drop-shadow-lg' : ''}`} />
+                )}
+                <span className={`text-[9px] font-bold mt-0.5 uppercase tracking-wider truncate max-w-[48px] ${view === tab.key ? 'text-purple-600 dark:text-purple-400' : ''}`}>
                   {tab.label}
                 </span>
               </motion.button>
