@@ -5,7 +5,7 @@ import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navi
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
-import { updateDoc, doc, arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { updateDoc, doc, arrayUnion, arrayRemove, serverTimestamp, getDoc } from 'firebase/firestore';
 import MapComponent from './MapComponent';
 import TripReport from './TripReport';
 import TripAnalytics from './TripAnalytics';
@@ -191,6 +191,37 @@ export default function PassengerDashboard({ user, profile }: Props) {
     setIsPickingOnMap(null);
   };
 
+  // Send SMS to emergency contact when ride starts
+  const sendEmergencyContactSMS = async (ride: Ride) => {
+    if (!profile.emergencyContact) return;
+
+    try {
+      const driverDoc = await getDoc(doc(db, 'users', ride.riderId || ''));
+      const driverProfile = driverDoc.data() as UserProfile;
+
+      if (!driverProfile) return;
+
+      // Call Cloud Function to send SMS via Twilio
+      const functions = (await import('firebase/functions')).getFunctions();
+      const sendEmergencySMS = (await import('firebase/functions')).httpsCallable(functions, 'sendEmergencyContactSMS');
+
+      const result = await sendEmergencySMS({
+        emergencyContactPhone: profile.emergencyContact.phone,
+        pickupAddress: ride.pickup.address,
+        destinationAddress: ride.destination.address,
+        driverName: driverProfile.name,
+        driverPhone: driverProfile.phoneNumber || driverProfile.phone || 'N/A',
+        passengerName: profile.name,
+      });
+
+      console.log('Emergency SMS sent:', result);
+      addNotification('Safety Alert Sent', 'Your emergency contact has been notified', 'success');
+    } catch (error) {
+      console.error('Error sending emergency SMS:', error);
+      // Don't show error to user - it's optional
+    }
+  };
+
   // Effects
   useEffect(() => {
     if (!activeRide) { const unsubscribe = subscribeToOnlineRiders(setOnlineRiders); return unsubscribe; }
@@ -218,7 +249,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
         if (!hasNotificationBeenSent(active.id, `status-${active.status}`)) {
           if (active.status === 'accepted') { addNotification(t('rideAccepted'), t('riderOnWay'), 'ride_accepted'); markNotificationAsSent(active.id, `status-${active.status}`); }
           else if (active.status === 'arrived') { addNotification(t('riderArrivedNotify'), t('riderArrivedMessage'), 'ride_accepted'); markNotificationAsSent(active.id, `status-${active.status}`); }
-          else if (active.status === 'ongoing') { addNotification(t('tripStartedNotify'), t('tripStartedMessage'), 'info'); markNotificationAsSent(active.id, `status-${active.status}`); }
+          else if (active.status === 'ongoing') { 
+            addNotification(t('tripStartedNotify'), t('tripStartedMessage'), 'info'); 
+            markNotificationAsSent(active.id, `status-${active.status}`);
+            // Send SMS to emergency contact when ride starts
+            sendEmergencyContactSMS(active);
+          }
         }
         if (active.status === 'ongoing' && active.riderConfirmedEnd && !hasNotificationBeenSent(active.id, 'driver-confirmed-end')) {
           addNotification('Destination Reached! 📍', 'Your driver has confirmed you\'ve reached the destination.', 'ride_accepted', [
@@ -236,7 +272,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setActiveRide(active || null); setCompletedRide(justCompleted || null);
     });
     return unsubscribe;
-  }, [user.uid, addNotification]);
+  }, [user.uid, addNotification, profile, sendEmergencyContactSMS]);
 
   useEffect(() => {
     const ridePickupLocation = passengerLocation || (activeRide && hasValidCoordinates(activeRide.pickup) ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng } : null);

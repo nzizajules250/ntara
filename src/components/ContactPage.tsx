@@ -7,6 +7,8 @@ import {
   Smartphone, Globe, Users, Zap
 } from 'lucide-react';
 import { useLanguage } from '../lib/i18n';
+import { db, auth } from '../lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function ContactPage() {
   const { t } = useLanguage();
@@ -95,17 +97,37 @@ export default function ContactPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setFormData({ name: '', email: '', phone: '', subject: '', message: '', category: 'general' });
-    }, 3000);
+    try {
+      const currentUser = auth.currentUser;
+      
+      // Save to Firestore
+      await addDoc(collection(db, 'contact_submissions'), {
+        userId: currentUser?.uid || 'anonymous',
+        userEmail: currentUser?.email || formData.email,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        subject: formData.subject,
+        message: formData.message,
+        category: formData.category,
+        submittedAt: serverTimestamp(),
+        status: 'new',
+        read: false
+      });
+
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+      
+      // Reset after 3 seconds
+      setTimeout(() => {
+        setIsSubmitted(false);
+        setFormData({ name: '', email: '', phone: '', subject: '', message: '', category: 'general' });
+      }, 3000);
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      setIsSubmitting(false);
+      alert('Failed to send message. Please try again.');
+    }
   };
 
   return (
