@@ -6,9 +6,9 @@ import twilio from 'twilio';
 admin.initializeApp();
 
 // Twilio credentials (stored as environment variables)
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '';
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || 'ACeea4d7156d894707d88e948f2b62982c';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || 'ad5d3f0d2990432d43b05fd24240d47d';
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+19782131205';
 
 // Initialize Twilio client
 const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
