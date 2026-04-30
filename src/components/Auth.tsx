@@ -158,6 +158,8 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
     }
   };
 
+  const inputClasses = "w-full bg-white/40 dark:bg-white/5 py-4 pl-12 pr-4 rounded-2xl border border-white/50 dark:border-white/10 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-4 focus:ring-purple-500/10 outline-none font-semibold text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-white/50 transition-all shadow-sm backdrop-blur-md";
+
   return (
     <>
       {/* Phone Number Overlay for Google Sign-In */}
@@ -167,31 +169,31 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="w-full max-w-md bg-white dark:bg-arctic-dark rounded-[2.5rem] p-8 shadow-2xl border border-arctic-light dark:border-arctic-medium"
+              className="w-full max-w-md bg-white/80 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] p-8 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] border border-white/60 dark:border-white/20 transition-colors duration-500"
             >
               <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-arctic-medium to-arctic-dark rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-arctic-medium/30">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-purple-500/30">
                   <Phone className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="text-2xl font-black text-arctic-dark dark:text-arctic-lightest mb-2">{t('phoneRequired')}</h2>
-                <p className="text-sm text-arctic-medium dark:text-arctic-light font-medium">We need your phone number to complete your profile and enable ride notifications.</p>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">{t('phoneRequired')}</h2>
+                <p className="text-sm text-slate-600 dark:text-white/70 font-medium">We need your phone number to complete your profile and enable ride notifications.</p>
               </div>
 
               <form onSubmit={handlePhoneSubmit} className="space-y-4">
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
                   <input 
                     type="tel"
                     required
                     autoFocus
                     placeholder={t('phoneNumber')}
-                    className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-sm text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                    className={inputClasses}
                     value={googlePhoneNumber}
                     onChange={e => setGooglePhoneNumber(e.target.value)}
                   />
@@ -199,7 +201,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
                 {error && (
                   <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    className="p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold flex items-center gap-2">
+                    className="p-3 bg-red-100/50 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 rounded-2xl text-xs font-bold flex items-center gap-2 backdrop-blur-md">
                     <Info className="w-4 h-4 flex-shrink-0" />
                     {error}
                   </motion.div>
@@ -210,7 +212,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   disabled={loading || !googlePhoneNumber.trim()}
-                  className="w-full bg-gradient-to-r from-arctic-medium to-arctic-dark text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-arctic-medium/25 disabled:opacity-50 transition-all"
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-purple-500/25 disabled:opacity-50 transition-all"
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t('continueButton')}<ArrowRight className="w-5 h-5" /></>}
                 </motion.button>
@@ -221,43 +223,49 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
       </AnimatePresence>
 
       {/* Main Auth Screen */}
-      <div className="min-h-screen bg-gradient-to-br from-arctic-lightest via-arctic-light to-arctic-light dark:from-arctic-dark dark:via-arctic-dark dark:to-arctic-dark flex flex-col items-center justify-center p-4 sm:p-6">
-        {/* Background Decorations */}
-        <div className="absolute top-0 left-0 w-72 h-72 bg-arctic-medium/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-72 h-72 bg-arctic-light/10 rounded-full blur-3xl" />
+      <div className="min-h-screen relative overflow-hidden bg-slate-50 dark:bg-slate-950 transition-colors duration-500 flex flex-col items-center justify-center p-4 sm:p-6">
+        {/* Dynamic Ambient Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-400/30 dark:bg-purple-600/30 rounded-full blur-[120px] mix-blend-multiply dark:mix-blend-screen animate-pulse" style={{ animationDuration: '4s' }} />
+          <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/30 dark:bg-indigo-600/30 rounded-full blur-[100px] mix-blend-multiply dark:mix-blend-screen animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+          <div className="absolute bottom-[-20%] left-[20%] w-[60%] h-[60%] bg-blue-400/20 dark:bg-blue-600/20 rounded-full blur-[130px] mix-blend-multiply dark:mix-blend-screen animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
+        </div>
 
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-lg bg-white dark:bg-arctic-dark rounded-[3rem] p-6 sm:p-8 shadow-2xl shadow-arctic-medium/10 border border-arctic-light dark:border-arctic-medium relative max-h-[95vh] overflow-y-auto"
+          className="w-full max-w-lg bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[3rem] p-6 sm:p-8 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] border border-white/60 dark:border-white/20 relative z-10 max-h-[95vh] overflow-y-auto transition-colors duration-500"
         >
+          {/* Internal Highlight */}
+          <div className="absolute inset-0 rounded-[3rem] pointer-events-none border border-white/40 dark:border-white/10 mix-blend-overlay" />
+
           {/* Logo & Header */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-8 relative z-10">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
               className="relative inline-block mb-4"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-arctic-medium to-arctic-dark rounded-[2rem] blur-2xl opacity-20" />
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-400/50 to-indigo-500/50 rounded-[2rem] blur-2xl opacity-50" />
               <img
                 src="/ntwara-logo.png"
                 alt="Ntwara"
-                className="relative h-20 sm:h-24 w-auto object-contain mx-auto"
+                className="relative h-20 sm:h-24 w-auto object-contain mx-auto drop-shadow-xl dark:brightness-0 dark:invert transition-all duration-500"
               />
             </motion.div>
-            <h1 className="text-3xl font-black text-arctic-dark dark:text-arctic-lightest">Ntwara</h1>
-            <p className="text-sm text-arctic-medium dark:text-arctic-light font-semibold mt-1">{t('empoweringJourney')}</p>
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight drop-shadow-sm transition-colors duration-500">Ntwara</h1>
+            <p className="text-sm text-slate-600 dark:text-white/70 font-medium mt-1 transition-colors duration-500">{t('empoweringJourney')}</p>
           </div>
 
           {/* Login/Register Toggle */}
-          <div className="flex bg-arctic-light dark:bg-arctic-medium p-1.5 rounded-2xl mb-6">
+          <div className="flex bg-white/40 dark:bg-white/5 p-1.5 rounded-2xl mb-6 backdrop-blur-md border border-white/50 dark:border-white/10 relative z-10 transition-colors duration-500">
             <motion.button 
               whileTap={{ scale: 0.95 }}
               onClick={() => setMode('login')}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                mode === 'login' ? 'bg-white dark:bg-arctic-light text-arctic-dark dark:text-arctic-dark shadow-lg' : 'text-arctic-medium dark:text-arctic-dark hover:text-arctic-dark dark:hover:text-arctic-dark'
+                mode === 'login' ? 'bg-white/80 dark:bg-white/20 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
               }`}
             >
               {t('login')}
@@ -266,7 +274,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               whileTap={{ scale: 0.95 }}
               onClick={() => setMode('register')}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                mode === 'register' ? 'bg-white dark:bg-arctic-light text-arctic-dark dark:text-arctic-dark shadow-lg' : 'text-arctic-medium dark:text-arctic-dark hover:text-arctic-dark dark:hover:text-arctic-dark'
+                mode === 'register' ? 'bg-white/80 dark:bg-white/20 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
               }`}
             >
               {t('register')}
@@ -274,113 +282,123 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           </div>
 
           {/* Role Selection (Register mode only) */}
-          {mode === 'register' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="grid grid-cols-2 gap-3 mb-6"
-            >
-              <motion.button 
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setRole('passenger')}
-                className={`p-4 rounded-2xl flex flex-col items-center gap-2 border-2 transition-all ${
-                  role === 'passenger' 
-                    ? 'border-arctic-medium bg-arctic-lightest dark:bg-arctic-medium/10 text-arctic-dark dark:text-arctic-light shadow-lg shadow-arctic-medium/10' 
-                    : 'border-arctic-light dark:border-arctic-medium bg-arctic-lightest dark:bg-arctic-medium text-arctic-medium hover:border-arctic-medium'
-                }`}
+          <AnimatePresence>
+            {mode === 'register' && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="grid grid-cols-2 gap-3 mb-6 relative z-10"
               >
-                <Smartphone className="w-6 h-6" />
-                <span className="text-xs font-black uppercase tracking-wider">{t('passenger')}</span>
-              </motion.button>
-              <motion.button 
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setRole('rider')}
-                className={`p-4 rounded-2xl flex flex-col items-center gap-2 border-2 transition-all ${
-                  role === 'rider' 
-                    ? 'border-arctic-medium bg-arctic-lightest dark:bg-arctic-medium/10 text-arctic-dark dark:text-arctic-light shadow-lg shadow-arctic-medium/10' 
-                    : 'border-arctic-light dark:border-arctic-medium bg-arctic-lightest dark:bg-arctic-medium text-arctic-medium hover:border-arctic-medium'
-                }`}
-              >
-                <Shield className="w-6 h-6" />
-                <span className="text-xs font-black uppercase tracking-wider">{t('rider')}</span>
-              </motion.button>
-            </motion.div>
-          )}
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setRole('passenger')}
+                  className={`p-4 rounded-2xl flex flex-col items-center gap-2 border transition-all backdrop-blur-md ${
+                    role === 'passenger' 
+                      ? 'border-purple-500/50 bg-purple-500/10 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 shadow-sm' 
+                      : 'border-white/50 dark:border-white/10 bg-white/40 dark:bg-white/5 text-slate-500 dark:text-white/50 hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <Smartphone className="w-6 h-6" />
+                  <span className="text-xs font-black uppercase tracking-wider">{t('passenger')}</span>
+                </motion.button>
+                <motion.button 
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setRole('rider')}
+                  className={`p-4 rounded-2xl flex flex-col items-center gap-2 border transition-all backdrop-blur-md ${
+                    role === 'rider' 
+                      ? 'border-emerald-500/50 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 shadow-sm' 
+                      : 'border-white/50 dark:border-white/10 bg-white/40 dark:bg-white/5 text-slate-500 dark:text-white/50 hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <Shield className="w-6 h-6" />
+                  <span className="text-xs font-black uppercase tracking-wider">{t('rider')}</span>
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Error Message */}
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="mb-4 p-4 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold flex items-center gap-2 border border-red-100 dark:border-red-500/20"
-            >
-              <Info className="w-4 h-4 flex-shrink-0" />
-              {error}
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-4 p-4 bg-red-100/50 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-2xl text-xs font-bold flex items-center gap-2 border border-red-200 dark:border-red-500/30 backdrop-blur-md relative z-10"
+              >
+                <Info className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Auth Form */}
-          <form onSubmit={handleManualAuth} className="space-y-3">
-            {mode === 'register' && (
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
-                <input 
-                  type="text"
-                  required
-                  placeholder={t('fullName')}
-                  className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-sm text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                />
-              </div>
-            )}
+          <form onSubmit={handleManualAuth} className="space-y-3 relative z-10">
+            <AnimatePresence>
+              {mode === 'register' && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
+                  <input 
+                    type="text"
+                    required
+                    placeholder={t('fullName')}
+                    className={inputClasses}
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
               <input 
                 type="tel"
                 required
                 placeholder={t('phoneNumber')}
-                className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-sm text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                className={inputClasses}
                 value={formData.phone}
                 onChange={e => setFormData({...formData, phone: e.target.value})}
               />
             </div>
 
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
               <input 
                 type={showPassword ? "text" : "password"}
                 required
                 placeholder={t('password')}
-                className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-12 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-sm text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                className={inputClasses + " pr-12"}
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-arctic-medium dark:text-arctic-light hover:text-arctic-dark dark:hover:text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/50 hover:text-slate-600 dark:hover:text-white transition-colors"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
 
-            {mode === 'register' && role === 'passenger' && (
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
-                <select 
-                  className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-sm text-arctic-dark dark:text-white appearance-none transition-all"
-                  value={formData.gender}
-                  onChange={e => setFormData({...formData, gender: e.target.value})}
-                  required
-                >
-                  <option value="">{t('gender')}</option>
-                  <option value="Male">{t('male')}</option>
-                  <option value="Female">{t('female')}</option>
-                </select>
-              </div>
-            )}
+            <AnimatePresence>
+              {mode === 'register' && role === 'passenger' && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
+                  <select 
+                    className={inputClasses + " appearance-none"}
+                    value={formData.gender}
+                    onChange={e => setFormData({...formData, gender: e.target.value})}
+                    required
+                  >
+                    <option value="" className="text-slate-900 bg-white">{t('gender')}</option>
+                    <option value="Male" className="text-slate-900 bg-white">{t('male')}</option>
+                    <option value="Female" className="text-slate-900 bg-white">{t('female')}</option>
+                  </select>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Rider Credentials */}
             <AnimatePresence>
@@ -389,32 +407,32 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 pt-4 border-t border-gray-100 dark:border-zinc-800"
+                  className="space-y-3 pt-4 border-t border-white/20 dark:border-white/10"
                 >
-                  <div className="flex items-center gap-2 justify-center">
-                    <BadgeCheck className="w-4 h-4 text-arctic-medium" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-arctic-medium dark:text-arctic-light">{t('riderCredentials')}</p>
+                  <div className="flex items-center gap-2 justify-center mb-2">
+                    <BadgeCheck className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 dark:text-white/60">{t('riderCredentials')}</p>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-arctic-medium dark:text-arctic-light" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/50" />
                       <select 
-                        className="w-full bg-white dark:bg-arctic-dark py-4 pl-10 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white appearance-none transition-all"
+                        className={inputClasses + " pl-10 appearance-none"}
                         value={formData.gender}
                         onChange={e => setFormData({...formData, gender: e.target.value})}
                         required
                       >
-                        <option value="">{t('gender')}</option>
-                        <option value="Male">{t('male')}</option>
-                        <option value="Female">{t('female')}</option>
+                        <option value="" className="text-slate-900 bg-white">{t('gender')}</option>
+                        <option value="Male" className="text-slate-900 bg-white">{t('male')}</option>
+                        <option value="Female" className="text-slate-900 bg-white">{t('female')}</option>
                       </select>
                     </div>
                     <div className="relative">
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-arctic-medium dark:text-arctic-light pointer-events-none" />
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/50 pointer-events-none" />
                       <input 
                         type="date"
-                        className="w-full bg-white dark:bg-arctic-dark py-4 pl-10 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white transition-all"
+                        className={inputClasses + " pl-10 dark:[color-scheme:dark]"}
                         value={formData.dob}
                         onChange={e => setFormData({...formData, dob: e.target.value})}
                         required
@@ -424,22 +442,22 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="relative">
-                      <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-arctic-medium dark:text-arctic-light" />
+                      <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/50" />
                       <select 
-                        className="w-full bg-white dark:bg-arctic-dark py-4 pl-10 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white appearance-none transition-all"
+                        className={inputClasses + " pl-10 appearance-none"}
                         value={formData.vehicleType}
                         onChange={e => setFormData({...formData, vehicleType: e.target.value as any})}
                       >
-                        <option value="car">{t('car')}</option>
-                        <option value="motorcycle">{t('motorcycle')}</option>
+                        <option value="car" className="text-slate-900 bg-white">{t('car')}</option>
+                        <option value="motorcycle" className="text-slate-900 bg-white">{t('motorcycle')}</option>
                       </select>
                     </div>
                     <div className="relative">
-                      <ClipboardCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-arctic-medium dark:text-arctic-light" />
+                      <ClipboardCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/50" />
                       <input 
                         type="text"
                         placeholder={t('licenseClass')}
-                        className="w-full bg-white dark:bg-arctic-dark py-4 pl-10 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                        className={inputClasses + " pl-10"}
                         value={formData.licenseClass}
                         onChange={e => setFormData({...formData, licenseClass: e.target.value})}
                         required
@@ -448,11 +466,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   </div>
 
                   <div className="relative">
-                    <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+                    <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
                     <input 
                       type="text"
                       placeholder={t('vehicleModelPlaceholder')}
-                      className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                      className={inputClasses}
                       value={formData.vehicleModel}
                       onChange={e => setFormData({...formData, vehicleModel: e.target.value})}
                       required
@@ -460,11 +478,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   </div>
 
                   <div className="relative">
-                    <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+                    <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
                     <input 
                       type="text"
                       placeholder={t('numberPlatePlaceholder')}
-                      className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white uppercase placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                      className={inputClasses + " uppercase"}
                       value={formData.numberPlate}
                       onChange={e => setFormData({...formData, numberPlate: e.target.value})}
                       required
@@ -472,11 +490,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   </div>
 
                   <div className="relative">
-                    <ClipboardCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+                    <ClipboardCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
                     <input 
                       type="text"
                       placeholder={t('permitCardNumber') || 'Permit Card Number'}
-                      className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                      className={inputClasses}
                       value={formData.permitCardNumber}
                       onChange={e => setFormData({...formData, permitCardNumber: e.target.value})}
                       required
@@ -484,11 +502,11 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
                   </div>
 
                   <div className="relative">
-                    <Camera className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-arctic-medium dark:text-arctic-light" />
+                    <Camera className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/50" />
                     <input 
                       type="url"
                       placeholder={t('profilePictureUrl')}
-                      className="w-full bg-white dark:bg-arctic-dark py-4 pl-12 pr-4 rounded-2xl border-2 border-arctic-light dark:border-arctic-medium focus:border-arctic-medium dark:focus:border-arctic-light outline-none font-semibold text-xs text-arctic-dark dark:text-white placeholder:text-arctic-medium dark:placeholder:text-arctic-light transition-all"
+                      className={inputClasses}
                       value={formData.avatarUrl}
                       onChange={e => setFormData({...formData, avatarUrl: e.target.value})}
                     />
@@ -503,7 +521,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-arctic-medium to-arctic-dark text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-arctic-medium/25 disabled:opacity-50 hover:from-arctic-dark hover:to-arctic-dark transition-all mt-4"
+              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-purple-500/25 disabled:opacity-50 hover:from-purple-700 hover:to-indigo-700 transition-all mt-4"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -517,10 +535,10 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           </form>
 
           {/* Divider */}
-          <div className="my-6 flex items-center gap-4 text-arctic-light dark:text-arctic-medium">
-            <div className="flex-1 h-px bg-arctic-light dark:bg-arctic-medium" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-arctic-medium dark:text-arctic-light">{t('continueWith')}</span>
-            <div className="flex-1 h-px bg-arctic-light dark:bg-arctic-medium" />
+          <div className="my-6 flex items-center gap-4 relative z-10">
+            <div className="flex-1 h-px bg-white/30 dark:bg-white/10" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-white/50 transition-colors duration-500">{t('continueWith')}</span>
+            <div className="flex-1 h-px bg-white/30 dark:bg-white/10" />
           </div>
 
           {/* Google Sign-In */}
@@ -529,7 +547,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
             whileTap={{ scale: 0.98 }}
             onClick={() => handleGoogleAuth(role)}
             disabled={loading}
-            className="w-full bg-white dark:bg-arctic-medium border-2 border-arctic-light dark:border-arctic-medium text-arctic-dark dark:text-arctic-lightest py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:border-arctic-medium dark:hover:border-arctic-light hover:text-arctic-medium dark:hover:text-arctic-light transition-all shadow-sm"
+            className="w-full bg-white/60 dark:bg-white/5 border border-white/60 dark:border-white/10 backdrop-blur-md text-slate-900 dark:text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-white/80 dark:hover:bg-white/10 transition-all shadow-sm relative z-10"
           >
             <img 
               src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
@@ -541,7 +559,7 @@ export default function Auth({ onAuthSuccess }: AuthProps) {
           </motion.button>
 
           {/* Terms */}
-          <p className="mt-6 text-center text-xs text-arctic-medium dark:text-arctic-light font-medium">
+          <p className="mt-8 text-center text-xs text-slate-500 dark:text-white/50 font-medium relative z-10 transition-colors duration-500">
             {t('authTerms')}
           </p>
         </motion.div>

@@ -132,6 +132,8 @@ export interface Ride {
   };
   status: RideStatus;
   fare: number;
+  routeDistanceMeters?: number;
+  routeDurationSeconds?: number;
   discountAmount?: number;
   promoCode?: string;
   cancellationReason?: string;

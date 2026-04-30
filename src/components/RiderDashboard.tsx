@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
 import { arrayUnion, arrayRemove, serverTimestamp } from 'firebase/firestore';
+import { formatDistanceKm, formatRwf } from '../lib/fareUtils';
 import MapComponent from './MapComponent';
 import TripReport from './TripReport';
 import TripAnalytics from './TripAnalytics';
@@ -40,6 +41,21 @@ const getDistanceInMeters = (
     Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
   return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const formatDurationMinutes = (durationSeconds?: number | null) => {
+  if (!durationSeconds || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return null;
+  }
+
+  const totalMinutes = Math.max(1, Math.round(durationSeconds / 60));
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+  }
+
+  return `${totalMinutes} min`;
 };
 
 export default function RiderDashboard({ user, profile }: Props) {
@@ -272,6 +288,8 @@ export default function RiderDashboard({ user, profile }: Props) {
   const previewRide = availableRides.find((ride) => ride.id === selectedRidePreviewId) || availableRides[0] || null;
   const previewPickupLocation = previewRide && hasValidCoordinates(previewRide.pickup) ? { lat: previewRide.pickup.lat, lng: previewRide.pickup.lng } : null;
   const previewDestinationLocation = previewRide && hasValidCoordinates(previewRide.destination) ? { lat: previewRide.destination.lat, lng: previewRide.destination.lng } : null;
+  const previewDurationLabel = previewRide?.routeDurationSeconds ? formatDurationMinutes(previewRide.routeDurationSeconds) : null;
+  const previewMeta = previewRide ? [previewRide.routeDistanceMeters ? formatDistanceKm(previewRide.routeDistanceMeters) : null, previewDurationLabel].filter(Boolean).join(' • ') : null;
   
   const previewMapMarkers = [
     ...(effectiveRiderLocation && hasValidCoordinates(effectiveRiderLocation) ? [{ id: 'driver-live', position: effectiveRiderLocation, label: profile.name, type: 'rider' as const, profile }] : []),
@@ -313,9 +331,140 @@ export default function RiderDashboard({ user, profile }: Props) {
     const riderActionLabel = activeRide.status === 'accepted' ? t('arrivedButton') : activeRide.status === 'arrived' ? activeRide.passengerConfirmedArrival ? (activeRide.riderConfirmedStart ? t('waitingForPassenger') : t('startTripButton')) : 'Waiting for passenger confirmation' : (activeRide.riderConfirmedEnd ? t('waitingForPassenger') : t('completeRideButton'));
 
     const riderActionHint = activeRide.status === 'accepted' ? 'Mark arrival once you reach the pickup point.' : activeRide.status === 'arrived' ? activeRide.passengerConfirmedArrival ? (activeRide.riderConfirmedStart ? 'Start request sent. Waiting for the passenger to approve the trip start.' : 'Passenger confirmed your arrival. Start the trip when you are both ready.') : 'The passenger needs to confirm your arrival before you can start the trip.' : activeRide.riderConfirmedEnd ? 'Arrival notice sent. Waiting for the passenger to confirm the trip has ended.' : 'Signal the passenger once you reach the destination.';
+    const rideDurationLabel = formatDurationMinutes(activeRide.routeDurationSeconds);
+    const rideDistanceLabel = activeRide.routeDistanceMeters ? formatDistanceKm(activeRide.routeDistanceMeters) : '--';
+    const rideFareLabel = activeRide.fare > 0 ? formatRwf(activeRide.fare) : t('byAgreement');
 
     return (
-      <div className="space-y-6">
+      <>
+      <div className="md:hidden relative -mx-3 -mt-3 min-h-[calc(100vh-4.75rem)] overflow-hidden bg-gradient-to-b from-slate-900 to-emerald-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem]">
+        <div className="absolute inset-0 h-full w-full overflow-hidden">
+          {rideMapMarkers.length > 0 ? (
+            <MapComponent
+              markers={rideMapMarkers}
+              center={rideMapCenter}
+              zoom={15}
+              showNearbyDrivers={false}
+              height="100%"
+              directionRequests={activeRideDirectionRequests}
+              freezeViewport={false}
+              showRouteControls={false}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 to-emerald-950">
+              <div className="text-center">
+                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-emerald-300" />
+                <p className="font-medium text-white/60">Loading map...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/35" />
+
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="absolute bottom-20 left-3 right-3 rounded-[2rem] border border-white/20 bg-white/95 shadow-2xl backdrop-blur-2xl dark:border-zinc-700/50 dark:bg-zinc-900/95"
+        >
+          <div className="space-y-4 p-4">
+            <button
+              onClick={() => setSelectedRidePreviewId(activeRide.id)}
+              className="w-full text-left"
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <div className="h-1.5 w-10 rounded-full bg-gray-200 dark:bg-zinc-700" />
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-gray-400 dark:text-zinc-500">Live trip</p>
+                <div className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                  activeRide.status === 'accepted'
+                    ? 'bg-blue-100 text-blue-700'
+                    : activeRide.status === 'arrived'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-violet-100 text-violet-700'
+                }`}>
+                  <span className={`h-2 w-2 rounded-full ${
+                    activeRide.status === 'accepted'
+                      ? 'bg-blue-500'
+                      : activeRide.status === 'arrived'
+                        ? 'bg-emerald-500'
+                        : 'bg-violet-500'
+                  }`} />
+                  {t(activeRide.status as any)}
+                </div>
+              </div>
+
+              {passengerProfile && (
+                <div className="mb-3 flex items-center gap-3 rounded-2xl bg-gray-50 px-3 py-2.5 dark:bg-zinc-800/80">
+                  {passengerProfile.avatarUrl ? (
+                    <img src={passengerProfile.avatarUrl} className="h-10 w-10 rounded-2xl object-cover" alt="" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-600">
+                      <User className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-gray-900 dark:text-white">{passengerProfile.name}</p>
+                    <p className="truncate text-xs font-semibold text-gray-500 dark:text-zinc-400">
+                      {activeRide.status === 'accepted' ? t('headingToPickup') : activeRide.status === 'arrived' ? t('waitingAtPickup') : t('headingToDestination')}
+                    </p>
+                  </div>
+                  <motion.a whileTap={{ scale: 0.95 }} href={`tel:${passengerProfile.phoneNumber}`} className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                    <Phone className="h-4 w-4" />
+                  </motion.a>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-green-50 p-3 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-green-500/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Fare</p>
+                  <p className="mt-1 text-sm font-black text-emerald-700 dark:text-emerald-300">{rideFareLabel}</p>
+                </div>
+                <div className="rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 to-sky-50 p-3 dark:border-cyan-500/20 dark:from-cyan-500/10 dark:to-sky-500/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-cyan-600 dark:text-cyan-400">Distance</p>
+                  <p className="mt-1 text-sm font-black text-cyan-700 dark:text-cyan-300">{rideDistanceLabel}</p>
+                </div>
+                <div className="rounded-2xl border border-violet-100 bg-gradient-to-r from-violet-50 to-indigo-50 p-3 dark:border-violet-500/20 dark:from-violet-500/10 dark:to-indigo-500/10">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-violet-600 dark:text-violet-400">Time</p>
+                  <p className="mt-1 text-sm font-black text-violet-700 dark:text-violet-300">{rideDurationLabel || '--'}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-[auto,1fr] items-start gap-x-3 gap-y-2">
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-green-100 dark:bg-green-500/10">
+                    <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-zinc-500">Pickup</p>
+                    <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeRide.pickup.address}</p>
+                  </div>
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-red-100 dark:bg-red-500/10">
+                    <Navigation className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-zinc-500">Destination</p>
+                    <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeRide.destination.address}</p>
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <motion.button whileTap={{ scale: 0.98 }} onClick={handleNextStep} disabled={riderActionDisabled} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 py-4 text-sm font-black text-white shadow-xl shadow-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50">
+              {riderActionLabel}
+              <ArrowRight className="h-4 w-4" />
+            </motion.button>
+
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+              <div className="flex items-start gap-2">
+                <Timer className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{riderActionHint}</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="hidden md:block space-y-6">
         {/* Gradient Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 dark:from-emerald-900 dark:via-teal-900 dark:to-cyan-950 rounded-[3rem] p-6 shadow-2xl shadow-emerald-500/20">
           <div className="absolute inset-0 opacity-20">
@@ -408,15 +557,22 @@ export default function RiderDashboard({ user, profile }: Props) {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800 rounded-2xl">
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">Fare</p>
-                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{t('byAgreement')}</p>
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800 rounded-2xl">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">Fare</p>
+                  <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                    {rideFareLabel}
+                  </p>
+                  {rideDistanceLabel !== '--' || rideDurationLabel ? (
+                    <p className="text-xs font-semibold text-gray-400 dark:text-zinc-500 mt-1">
+                      {[rideDistanceLabel !== '--' ? rideDistanceLabel : null, rideDurationLabel].filter(Boolean).join(' • ')}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
               </div>
-              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
 
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleNextStep} disabled={riderActionDisabled} className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-emerald-500/25 transition-all">
               {riderActionLabel}
@@ -432,6 +588,7 @@ export default function RiderDashboard({ user, profile }: Props) {
           </div>
         </motion.div>
       </div>
+      </>
     );
   }
 
@@ -544,7 +701,23 @@ export default function RiderDashboard({ user, profile }: Props) {
                 <div className="p-4 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white dark:from-zinc-800 dark:to-zinc-900">
                   <div>
                     <p className="font-bold text-sm text-gray-900 dark:text-white">{previewRide ? 'Route Preview' : 'Your Location'}</p>
-                    <p className="text-xs text-gray-400 dark:text-zinc-500 font-semibold mt-0.5">{previewRide ? `${previewRide.pickup.address} → ${previewRide.destination.address}` : 'Visible to nearby passengers'}</p>
+                    <p className="text-xs text-gray-400 dark:text-zinc-500 font-semibold mt-0.5">
+                      {previewRide
+                        ? previewMeta || `${previewRide.pickup.address} → ${previewRide.destination.address}`
+                        : 'Visible to nearby passengers'}
+                    </p>
+                    {previewRide && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                          {previewRide.fare > 0 ? formatRwf(previewRide.fare) : t('byAgreement')}
+                        </span>
+                        {previewDurationLabel && (
+                          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                            {previewDurationLabel}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <motion.button whileTap={{ scale: 0.95 }} onClick={() => setIsPickingOnMap(!isPickingOnMap)} className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${isPickingOnMap ? 'bg-red-500 text-white' : 'bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300 hover:bg-gray-300 dark:hover:bg-zinc-600'}`}>
                     <MapIcon className="w-4 h-4" />{isPickingOnMap ? 'Cancel' : 'Update Location'}
@@ -596,10 +769,14 @@ export default function RiderDashboard({ user, profile }: Props) {
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-600 rounded-2xl flex items-center justify-center shadow-lg"><User className="w-5 h-5 text-white" /></div>
                           <div>
                             <p className="font-bold text-gray-900 dark:text-white">{t('passengerRequest')}</p>
-                            <p className="text-xs text-gray-400 dark:text-zinc-500 font-semibold">~ 2.4 km away</p>
+                            <p className="text-xs text-gray-400 dark:text-zinc-500 font-semibold">
+                              {[ride.routeDistanceMeters ? `Trip • ${formatDistanceKm(ride.routeDistanceMeters)}` : '~ 2.4 km away', ride.routeDurationSeconds ? formatDurationMinutes(ride.routeDurationSeconds) : null].filter(Boolean).join(' • ')}
+                            </p>
                           </div>
                         </div>
-                        <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-xl font-black text-xs">{t('byAgreement')}</div>
+                        <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-xl font-black text-xs">
+                          {ride.fare > 0 ? formatRwf(ride.fare) : t('byAgreement')}
+                        </div>
                       </div>
                       <div className="space-y-3 mb-4">
                         <div className="flex items-start gap-3">
@@ -615,6 +792,16 @@ export default function RiderDashboard({ user, profile }: Props) {
                             <p className="text-[10px] font-bold text-gray-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">To</p>
                             <p className="text-sm font-semibold text-gray-700 dark:text-zinc-300">{ride.destination.address}</p>
                           </div>
+                        </div>
+                      </div>
+                      <div className="mb-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                          <p className="text-[10px] font-black uppercase tracking-widest">Fare</p>
+                          <p className="mt-1 text-sm font-black">{ride.fare > 0 ? formatRwf(ride.fare) : t('byAgreement')}</p>
+                        </div>
+                        <div className="rounded-xl bg-violet-50 px-3 py-2 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                          <p className="text-[10px] font-black uppercase tracking-widest">Time</p>
+                          <p className="mt-1 text-sm font-black">{formatDurationMinutes(ride.routeDurationSeconds) || '--'}</p>
                         </div>
                       </div>
                       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={(e) => { e.stopPropagation(); handleAccept(ride.id); }} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:from-purple-700 hover:to-indigo-700 shadow-xl shadow-purple-500/25 transition-all">

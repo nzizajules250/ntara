@@ -287,7 +287,7 @@ const HowItWorks = ({ profile }: Props) => {
           <p className="mb-3 text-center text-xs font-black uppercase tracking-[0.2em] text-gray-400 dark:text-zinc-500">
             {t('switchGuide')}
           </p>
-          <div className="mx-auto flex w-full max-w-md rounded-2xl bg-gray-100 dark:bg-zinc-800 p-1.5">
+          <div className="mx-auto flex w-full max-w-md rounded-2xl bg-white/60 dark:bg-white/5 backdrop-blur-3xl border border-white/60 dark:border-white/10 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] p-1.5 transition-colors duration-500">
             {[
               { value: 'passenger' as const, label: t('passenger'), icon: Users },
               { value: 'driver' as const, label: t('driver'), icon: Car },
@@ -331,10 +331,10 @@ const HowItWorks = ({ profile }: Props) => {
                   onClick={() => setExpandedSection(isExpanded ? null : step.id)}
                   className="w-full text-left"
                 >
-                  <div className={`bg-white dark:bg-zinc-900 rounded-[2rem] p-5 shadow-sm hover:shadow-md transition-all border ${
+                  <div className={`bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2rem] p-5 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] hover:shadow-lg transition-all duration-500 border ${
                     isExpanded 
-                      ? 'border-purple-300 dark:border-purple-700 ring-2 ring-purple-500/10 shadow-lg' 
-                      : 'border-gray-100 dark:border-zinc-800'
+                      ? 'border-purple-300 dark:border-purple-500 ring-2 ring-purple-500/20' 
+                      : 'border-white/60 dark:border-white/20'
                   }`}>
                     <div className="flex items-start gap-4">
                       {/* Step Number */}
@@ -425,7 +425,7 @@ const HowItWorks = ({ profile }: Props) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.05 }}
                   whileHover={{ y: -4 }}
-                  className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 shadow-sm hover:shadow-lg transition-all border border-gray-100 dark:border-zinc-800"
+                  className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2rem] p-6 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] hover:shadow-lg transition-all duration-500 border border-white/60 dark:border-white/20"
                 >
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-indigo-100 dark:from-purple-500/10 dark:to-indigo-500/10 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
                     <Icon className="w-6 h-6 text-purple-600 dark:text-purple-400" />

@@ -25,6 +25,12 @@ export interface PlaceDetails {
   types: string[];
 }
 
+export interface GeocodedAddress {
+  address: string;
+  lat: number;
+  lng: number;
+}
+
 /**
  * Get route details using Directions API
  */
@@ -147,6 +153,51 @@ export async function getPlaceDetails(
     });
   } catch (error) {
     console.error('Error getting place details:', error);
+    return null;
+  }
+}
+
+/**
+ * Forward geocode a typed address into map coordinates
+ */
+export async function geocodeAddressLocation(
+  address: string
+): Promise<GeocodedAddress | null> {
+  if (!address.trim()) {
+    return null;
+  }
+
+  if (!window.google?.maps?.Geocoder) {
+    console.error('Google Maps Geocoder not loaded');
+    return null;
+  }
+
+  try {
+    const geocoder = new window.google.maps.Geocoder();
+
+    return new Promise((resolve) => {
+      geocoder.geocode(
+        {
+          address,
+          componentRestrictions: { country: 'RW' }
+        },
+        (results, status) => {
+          if (status === window.google.maps.GeocoderStatus.OK && results?.[0]) {
+            const location = results[0].geometry.location;
+            resolve({
+              address: results[0].formatted_address || address,
+              lat: location.lat(),
+              lng: location.lng()
+            });
+            return;
+          }
+
+          resolve(null);
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Error geocoding address:', error);
     return null;
   }
 }

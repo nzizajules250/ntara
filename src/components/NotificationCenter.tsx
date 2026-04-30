@@ -21,9 +21,14 @@ export interface AppNotification {
 
 interface NotificationContextType {
   notifications: AppNotification[];
+  unreadCount: number;
   addNotification: (title: string, message: string, type: NotificationType, actions?: AppNotification['actions'], persistent?: boolean) => void;
   removeNotification: (id: string) => void;
   clearAll: () => void;
+  isPanelOpen: boolean;
+  openPanel: () => void;
+  closePanel: () => void;
+  togglePanel: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -38,7 +43,8 @@ export function useNotifications() {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const unreadCount = notifications.length;
 
   const addNotification = (
     title: string,
@@ -59,7 +65,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
     
     setNotifications((prev) => [newNotification, ...prev]);
-    setUnreadCount((prev) => prev + 1);
 
     // Send native push notification
     sendPushNotification(title, {
@@ -91,23 +96,48 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const clearAll = () => {
     setNotifications([]);
-    setUnreadCount(0);
   };
+
+  const openPanel = () => setIsPanelOpen(true);
+  const closePanel = () => setIsPanelOpen(false);
+  const togglePanel = () => setIsPanelOpen((prev) => !prev);
 
   useEffect(() => {
     requestNotificationPermission();
   }, []);
 
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, removeNotification, clearAll }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, addNotification, removeNotification, clearAll, isPanelOpen, openPanel, closePanel, togglePanel }}>
       {children}
       <NotificationOverlay 
         notifications={notifications}
         unreadCount={unreadCount}
         removeNotification={removeNotification}
         clearAll={clearAll}
+        isPanelOpen={isPanelOpen}
+        closePanel={closePanel}
       />
     </NotificationContext.Provider>
+  );
+}
+
+export function NotificationBellButton({ className = '' }: { className?: string }) {
+  const { unreadCount, togglePanel } = useNotifications();
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.92 }}
+      onClick={togglePanel}
+      className={`relative p-2.5 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-gray-500 dark:text-gray-400 ${className}`}
+      aria-label="Open notifications"
+    >
+      <Bell className="w-5 h-5" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+    </motion.button>
   );
 }
 
@@ -115,46 +145,29 @@ function NotificationOverlay({
   notifications,
   unreadCount,
   removeNotification,
-  clearAll
+  clearAll,
+  isPanelOpen,
+  closePanel
 }: {
   notifications: AppNotification[];
   unreadCount: number;
   removeNotification: (id: string) => void;
   clearAll: () => void;
+  isPanelOpen: boolean;
+  closePanel: () => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-
   return (
     <>
-      {/* Notification Bell Icon (Top-right corner) */}
-      {unreadCount > 0 && (
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="fixed top-4 right-4 z-[300] bg-white rounded-full p-3 shadow-xl border border-gray-200 hover:shadow-2xl transition-all"
-          onClick={() => setShowAll(!showAll)}
-        >
-          <Bell className="w-6 h-6 text-red-500" />
-          <motion.span
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center"
-          >
-            {unreadCount}
-          </motion.span>
-        </motion.button>
-      )}
-
       {/* Notification Drawer */}
       <AnimatePresence>
-        {showAll && (
+        {isPanelOpen && (
           <>
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowAll(false)}
+              onClick={closePanel}
               className="fixed inset-0 bg-black/20 z-[280]"
             />
 
@@ -163,14 +176,14 @@ function NotificationOverlay({
               initial={{ x: 400, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 400, opacity: 0 }}
-              className="fixed top-0 right-0 z-[290] h-screen w-full sm:w-96 bg-white shadow-2xl overflow-y-auto"
+              className="fixed top-0 right-0 z-[290] h-screen w-full overflow-y-auto bg-white shadow-2xl dark:bg-zinc-950 dark:shadow-black/40 sm:w-96"
             >
-              <div className="sticky top-0 bg-gradient-to-b from-white to-transparent p-4 border-b border-gray-100">
+              <div className="sticky top-0 border-b border-gray-100 bg-gradient-to-b from-white to-transparent p-4 dark:border-zinc-800 dark:from-zinc-950">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-lg font-bold text-gray-900">Notifications</h2>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">Notifications</h2>
                   <button
-                    onClick={() => setShowAll(false)}
-                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                    onClick={closePanel}
+                    className="rounded-lg p-1 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -186,12 +199,12 @@ function NotificationOverlay({
               </div>
 
               {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+                <div className="flex h-full flex-col items-center justify-center p-4 text-gray-500 dark:text-zinc-400">
                   <Bell className="w-12 h-12 mb-2 opacity-50" />
                   <p className="text-sm font-medium">No notifications</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 dark:divide-zinc-800">
                   {notifications.map((notification) => (
                     <NotificationItem
                       key={notification.id}
@@ -242,24 +255,24 @@ function NotificationItem({
   const getColors = () => {
     switch (notification.type) {
       case 'success':
-        return { bg: 'bg-emerald-50', border: 'bg-emerald-500', icon: 'text-emerald-600', iconBg: 'bg-emerald-50' };
+        return { bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'bg-emerald-500', icon: 'text-emerald-600 dark:text-emerald-400', iconBg: 'bg-emerald-50 dark:bg-emerald-500/10' };
       case 'error':
-        return { bg: 'bg-red-50', border: 'bg-red-500', icon: 'text-red-600', iconBg: 'bg-red-50' };
+        return { bg: 'bg-red-50 dark:bg-red-500/10', border: 'bg-red-500', icon: 'text-red-600 dark:text-red-400', iconBg: 'bg-red-50 dark:bg-red-500/10' };
       case 'warning':
-        return { bg: 'bg-amber-50', border: 'bg-amber-500', icon: 'text-amber-600', iconBg: 'bg-amber-50' };
+        return { bg: 'bg-amber-50 dark:bg-amber-500/10', border: 'bg-amber-500', icon: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-50 dark:bg-amber-500/10' };
       case 'ride_request':
-        return { bg: 'bg-black/5', border: 'bg-black', icon: 'text-black', iconBg: 'bg-black/10' };
+        return { bg: 'bg-black/5 dark:bg-white/5', border: 'bg-black dark:bg-white', icon: 'text-black dark:text-white', iconBg: 'bg-black/10 dark:bg-white/10' };
       case 'ride_accepted':
-        return { bg: 'bg-blue-50', border: 'bg-blue-500', icon: 'text-blue-600', iconBg: 'bg-blue-50' };
+        return { bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'bg-blue-500', icon: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-50 dark:bg-blue-500/10' };
       default:
-        return { bg: 'bg-blue-50', border: 'bg-blue-500', icon: 'text-blue-600', iconBg: 'bg-blue-50' };
+        return { bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'bg-blue-500', icon: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-50 dark:bg-blue-500/10' };
     }
   };
 
   const colors = getColors();
 
   return (
-    <div className={`${colors.bg} rounded-2xl shadow-lg border border-gray-100 overflow-hidden flex flex-col`}>
+    <div className={`${colors.bg} flex flex-col overflow-hidden rounded-2xl border border-gray-100 shadow-lg dark:border-zinc-800`}>
       <div className="flex">
         <div className={`w-1.5 ${colors.border}`} />
 
@@ -274,13 +287,13 @@ function NotificationItem({
           </div>
 
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-bold text-gray-900 leading-none mb-1">{notification.title}</h4>
-            <p className="text-xs text-gray-600 leading-relaxed font-medium">{notification.message}</p>
+            <h4 className="mb-1 leading-none text-sm font-bold text-gray-900 dark:text-white">{notification.title}</h4>
+            <p className="text-xs font-medium leading-relaxed text-gray-600 dark:text-zinc-300">{notification.message}</p>
           </div>
 
           <button
             onClick={() => onRemove(notification.id)}
-            className="p-1 hover:bg-gray-200/50 rounded-lg h-fit text-gray-400 transition-colors flex-shrink-0"
+            className="h-fit flex-shrink-0 rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-200/50 dark:text-zinc-500 dark:hover:bg-zinc-800/80"
           >
             <X className="w-4 h-4" />
           </button>
@@ -288,7 +301,7 @@ function NotificationItem({
       </div>
 
       {notification.actions && notification.actions.length > 0 && (
-        <div className="border-t border-gray-200 p-3 sm:p-4 flex gap-2 flex-col sm:flex-row">
+        <div className="flex flex-col gap-2 border-t border-gray-200 p-3 dark:border-zinc-800 sm:flex-row sm:p-4">
           {notification.actions.map((action, idx) => (
             <button
               key={idx}
@@ -298,8 +311,8 @@ function NotificationItem({
               }}
               className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all ${
                 action.style === 'primary'
-                  ? 'bg-black text-white hover:bg-gray-800'
-                  : 'bg-gray-200/50 text-gray-900 hover:bg-gray-300/50'
+                  ? 'bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200'
+                  : 'bg-gray-200/50 text-gray-900 hover:bg-gray-300/50 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700'
               } flex-1 sm:flex-auto`}
             >
               {action.label}

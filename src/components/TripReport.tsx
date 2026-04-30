@@ -4,6 +4,7 @@ import { Ride, db, getUserProfile, UserProfile } from '../lib/firebase';
 import { Download, Calendar, Filter, Loader2, AlertCircle, MapPin, Clock, DollarSign, TrendingUp, Star, ChevronDown, FileText, BarChart3, Route, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
+import { formatDistanceKm, formatRwf } from '../lib/fareUtils';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
 interface TripReportProps {
@@ -93,8 +94,6 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
   const getUserName = (uid: string): string => {
     const profile = userProfiles[uid];
     if (profile?.name) return profile.name;
-    if (profile?.firstName && profile?.lastName) return `${profile.firstName} ${profile.lastName}`;
-    if (profile?.firstName) return profile.firstName;
     return uid;
   };
 
@@ -140,7 +139,7 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
   const averageRating = trips.length > 0
     ? (trips.reduce((sum, trip) => sum + (trip.riderRating || 0), 0) / trips.length).toFixed(1)
     : '0';
-  const totalDistance = trips.length * 5.2; // Placeholder - replace with actual distance calculation
+  const totalDistanceMeters = trips.reduce((sum, trip) => sum + (trip.routeDistanceMeters || 0), 0);
 
   const stats = [
     { 
@@ -152,7 +151,7 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
     },
     { 
       label: 'Total Fare', 
-      value: `$${totalFare.toFixed(2)}`, 
+      value: formatRwf(totalFare), 
       icon: DollarSign, 
       color: 'from-emerald-400 to-green-600',
       bgColor: 'bg-emerald-50 dark:bg-emerald-500/10'
@@ -163,6 +162,13 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
       icon: Star, 
       color: 'from-amber-400 to-orange-600',
       bgColor: 'bg-amber-50 dark:bg-amber-500/10'
+    },
+    {
+      label: 'Distance',
+      value: formatDistanceKm(totalDistanceMeters),
+      icon: Route,
+      color: 'from-sky-400 to-blue-600',
+      bgColor: 'bg-sky-50 dark:bg-sky-500/10'
     },
   ];
 
@@ -244,7 +250,7 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
 
       {/* Summary Stats */}
       {trips.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((stat, i) => (
             <motion.div
               key={i}
@@ -387,11 +393,11 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
                   <div className="text-right ml-4">
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-zinc-800 dark:to-zinc-900 rounded-2xl p-4 shadow-sm">
                       <p className="text-2xl font-black text-gray-900 dark:text-white">
-                        ${trip.fare || '0'}
+                        {formatRwf(trip.fare || 0)}
                       </p>
                       {trip.discountAmount && trip.discountAmount > 0 && (
                         <p className="text-xs text-emerald-500 font-bold line-through opacity-75">
-                          ${trip.fare + trip.discountAmount}
+                          {formatRwf(trip.fare + trip.discountAmount)}
                         </p>
                       )}
                       {trip.riderRating && (

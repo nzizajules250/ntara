@@ -3,6 +3,7 @@ import { User as FirebaseUser } from 'firebase/auth';
 import { Ride, db, UserProfile } from '../lib/firebase';
 import { BarChart3, TrendingUp, User as UserIcon, Loader2, AlertCircle, DollarSign, Star, Activity, ArrowUpRight, Users, Calendar, Route } from 'lucide-react';
 import { motion } from 'motion/react';
+import { formatRwf } from '../lib/fareUtils';
 import { useLanguage } from '../lib/i18n';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 
@@ -254,7 +255,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
                   barColor = 'from-violet-400 to-purple-600';
                 } else if (selectedMetric === 'fare') {
                   value = stat.totalFare;
-                  label = `$${stat.totalFare.toFixed(2)}`;
+                  label = formatRwf(stat.totalFare);
                   barColor = 'from-emerald-400 to-green-600';
                 } else {
                   value = stat.averageRating;
@@ -323,7 +324,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
                 <DollarSign className="w-5 h-5 text-white" />
               </div>
               <p className="text-xl font-black text-gray-900 dark:text-white leading-tight">
-                ${avgMonthlyFare.toFixed(0)}
+                {formatRwf(avgMonthlyFare)}
               </p>
               <p className="text-[10px] font-bold text-gray-500 dark:text-zinc-400 uppercase tracking-wider mt-0.5">Avg/Month</p>
             </motion.div>
@@ -399,7 +400,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
                           </span>
                           <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-zinc-600" />
                           <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            ${companion.totalFare.toFixed(2)}
+                            {formatRwf(companion.totalFare)}
                           </span>
                         </div>
                       </div>

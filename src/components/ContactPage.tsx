@@ -170,7 +170,7 @@ export default function ContactPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.05 }}
                 whileHover={{ y: -4 }}
-                className={`${info.bgColor} rounded-[2rem] p-6 border border-gray-100 dark:border-zinc-800 shadow-sm hover:shadow-lg transition-all`}
+                className={`${info.bgColor} rounded-[2rem] p-6 border border-white/60 dark:border-white/10 backdrop-blur-3xl shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] hover:shadow-lg transition-all duration-500`}
               >
                 <div className={`w-12 h-12 ${info.iconBg} rounded-2xl flex items-center justify-center mb-4 shadow-lg`}>
                   <Icon className="w-6 h-6 text-white" />
@@ -195,7 +195,7 @@ export default function ContactPage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-zinc-800"
+            className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] p-8 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60 dark:border-white/20 transition-all duration-500"
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -349,7 +349,7 @@ export default function ContactPage() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
-            className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 shadow-sm border border-gray-100 dark:border-zinc-800"
+            className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] p-8 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60 dark:border-white/20 transition-all duration-500"
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
@@ -368,7 +368,7 @@ export default function ContactPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.05 }}
-                  className="bg-gray-50 dark:bg-zinc-800 rounded-2xl p-5 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all cursor-pointer group"
+                  className="bg-white/40 dark:bg-white/5 rounded-2xl p-5 hover:bg-white/60 dark:hover:bg-white/10 transition-all duration-300 cursor-pointer group border border-transparent hover:border-white/40 dark:hover:border-white/10"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 shadow-lg">
@@ -427,7 +427,7 @@ export default function ContactPage() {
             <motion.div
               key={index}
               whileHover={{ y: -2 }}
-              className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-800 text-center"
+              className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2rem] p-6 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] border border-white/60 dark:border-white/20 text-center transition-all duration-500"
             >
               <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg`}>
                 <stat.icon className="w-6 h-6 text-white" />

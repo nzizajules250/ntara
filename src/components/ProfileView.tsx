@@ -248,7 +248,7 @@ export default function ProfileView({ profile }: Props) {
             <h3 className="text-xs font-black uppercase tracking-[0.15em] text-gray-400 dark:text-zinc-500">{t('accountDetails')}</h3>
           </div>
           
-          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-zinc-800 shadow-sm">
+          <div className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
             <motion.div 
               whileHover={{ backgroundColor: 'rgba(0,0,0,0.02)' }}
               className="p-5 flex items-center gap-4 transition-colors cursor-pointer"
@@ -314,7 +314,7 @@ export default function ProfileView({ profile }: Props) {
             )}
           </div>
           
-          <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-zinc-800 shadow-sm">
+          <div className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
             <AnimatePresence mode="wait">
               {isEditingContact ? (
                 <motion.div 
@@ -401,7 +401,7 @@ export default function ProfileView({ profile }: Props) {
             <h3 className="text-xs font-black uppercase tracking-[0.15em] text-gray-400 dark:text-zinc-500 px-2">
               {t('favoriteDrivers') || 'Favorite Drivers'}
             </h3>
-            <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-zinc-800 shadow-sm divide-y divide-gray-50 dark:divide-zinc-800">
+            <div className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500 divide-y divide-white/20 dark:divide-white/10">
               {favoriteDrivers.map((driver) => (
                 <motion.div 
                   key={driver.uid} 
@@ -441,7 +441,7 @@ export default function ProfileView({ profile }: Props) {
         {profile.role === 'rider' && (
           <div className="space-y-3">
             <h3 className="text-xs font-black uppercase tracking-[0.15em] text-gray-400 dark:text-zinc-500 px-2">{t('vehicleIntelligence')}</h3>
-            <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-gray-100 dark:border-zinc-800 shadow-sm divide-y divide-gray-50 dark:divide-zinc-800">
+            <div className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500 divide-y divide-white/20 dark:divide-white/10">
               <motion.div whileHover={{ backgroundColor: 'rgba(0,0,0,0.02)' }} className="p-5 flex items-center gap-4 transition-colors">
                 <div className="w-12 h-12 bg-gradient-to-br from-slate-400 to-slate-600 rounded-2xl flex items-center justify-center shadow-lg shadow-slate-500/20">
                   <Car className="w-5 h-5 text-white" />
@@ -477,7 +477,7 @@ export default function ProfileView({ profile }: Props) {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.1 }}
                   whileHover={{ scale: 1.05 }}
-                  className="bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-gray-100 dark:border-zinc-800 shadow-sm flex items-center gap-3 hover:shadow-md transition-all"
+                  className="bg-white/60 dark:bg-white/10 backdrop-blur-xl p-4 rounded-3xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] flex items-center gap-3 hover:shadow-md transition-all duration-500"
                 >
                   <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/20">
                     <Award className="w-5 h-5 text-white" />
@@ -517,7 +517,7 @@ export default function ProfileView({ profile }: Props) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 100, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white dark:bg-zinc-950 w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 sm:p-10 relative z-10 shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-3xl w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 sm:p-10 relative z-10 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] border border-white/60 dark:border-white/10 max-h-[90vh] overflow-y-auto transition-colors duration-500"
             >
               <div className="flex items-center justify-between mb-8">
                 <div>

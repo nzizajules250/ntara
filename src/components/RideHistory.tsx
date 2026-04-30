@@ -5,6 +5,7 @@ import { Clock, MapPin, Navigation, DollarSign, Calendar, ChevronRight, User as 
 import { motion, AnimatePresence } from 'motion/react';
 import { updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useLanguage } from '../lib/i18n';
+import { formatRwf } from '../lib/fareUtils';
 
 interface Props {
   user: FirebaseUser;
@@ -67,21 +68,21 @@ export default function RideHistory({ user, profile }: Props) {
 
   const stats = [
     { 
-      label: t('totalSpent') || 'Total Spent', 
-      value: `$${totalSpent.toFixed(2)}`, 
+      label: 'Total Spent', 
+      value: formatRwf(totalSpent), 
       icon: DollarSign, 
       color: 'from-emerald-400 to-emerald-600',
       bgColor: 'bg-emerald-50 dark:bg-emerald-500/10'
     },
     { 
-      label: t('completedTrips') || 'Completed', 
+      label: 'Completed', 
       value: completedRides.toString(), 
       icon: TrendingUp, 
       color: 'from-blue-400 to-blue-600',
       bgColor: 'bg-blue-50 dark:bg-blue-500/10'
     },
     { 
-      label: t('cancelledTrips') || 'Cancelled', 
+      label: 'Cancelled', 
       value: cancelledRides.toString(), 
       icon: TrendingDown, 
       color: 'from-red-400 to-red-600',
@@ -128,17 +129,21 @@ export default function RideHistory({ user, profile }: Props) {
       {/* Filter Tabs */}
       {history.length > 0 && (
         <div className="flex gap-2 p-1 bg-gray-100 dark:bg-zinc-800 rounded-2xl">
-          {(['all', 'completed', 'cancelled'] as const).map((f) => (
+          {([
+            { key: 'all' as const, label: 'All' },
+            { key: 'completed' as const, label: 'Completed' },
+            { key: 'cancelled' as const, label: 'Cancelled' }
+          ]).map(({ key, label }) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
+              key={key}
+              onClick={() => setFilter(key)}
               className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all ${
-                filter === f 
+                filter === key 
                   ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-lg' 
                   : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
               }`}
             >
-              {t(f)}
+              {label}
             </button>
           ))}
         </div>
@@ -146,7 +151,7 @@ export default function RideHistory({ user, profile }: Props) {
 
       {/* Ride List */}
       {filteredHistory.length === 0 ? (
-        <div className="bg-white dark:bg-zinc-900 p-12 rounded-3xl border-2 border-dashed border-gray-200 dark:border-zinc-800 text-center">
+        <div className="bg-white/60 dark:bg-white/5 backdrop-blur-3xl p-12 rounded-3xl border-2 border-dashed border-white/60 dark:border-white/20 text-center transition-colors duration-500">
           <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-800 dark:to-zinc-700 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-lg">
             <HistoryIcon className="w-10 h-10 text-gray-400 dark:text-zinc-500" />
           </div>
@@ -162,7 +167,7 @@ export default function RideHistory({ user, profile }: Props) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
               onClick={() => setSelectedRide(ride)}
-              className="bg-white dark:bg-zinc-900 p-5 rounded-[2rem] border border-gray-100 dark:border-zinc-800 shadow-sm cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all group"
+              className="bg-white/60 dark:bg-white/10 backdrop-blur-3xl p-5 rounded-[2rem] border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] cursor-pointer hover:shadow-md hover:border-purple-300 dark:hover:border-purple-500 transition-all duration-500 group"
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center gap-3">
@@ -189,11 +194,11 @@ export default function RideHistory({ user, profile }: Props) {
                     {ride.fare > 0 ? (
                       ride.discountAmount ? (
                         <span className="flex flex-col items-end">
-                          <span>${ride.fare}</span>
-                          <span className="text-xs text-emerald-500 line-through opacity-75">${ride.fare + ride.discountAmount}</span>
+                          <span>{formatRwf(ride.fare)}</span>
+                          <span className="text-xs text-emerald-500 line-through opacity-75">{formatRwf(ride.fare + ride.discountAmount)}</span>
                         </span>
                       ) : (
-                        `$${ride.fare}`
+                        formatRwf(ride.fare)
                       )
                     ) : (
                       <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{t('byAgreement')}</span>
@@ -305,7 +310,7 @@ export default function RideHistory({ user, profile }: Props) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 100, scale: 0.95 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white dark:bg-zinc-950 w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 relative z-10 shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-white/80 dark:bg-zinc-950/80 backdrop-blur-3xl w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 relative z-10 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] border border-white/60 dark:border-white/10 max-h-[90vh] overflow-y-auto transition-colors duration-500"
             >
               {/* Close Button */}
               <button 
@@ -347,13 +352,13 @@ export default function RideHistory({ user, profile }: Props) {
                     {selectedRide.fare > 0 ? t('totalFare') : 'Fare Type'}
                   </p>
                   <p className="text-2xl font-black text-gray-900 dark:text-white">
-                    {selectedRide.fare > 0 ? `$${selectedRide.fare}` : t('byAgreement')}
+                    {selectedRide.fare > 0 ? formatRwf(selectedRide.fare) : t('byAgreement')}
                   </p>
                   {selectedRide.fare > 0 && selectedRide.discountAmount && selectedRide.discountAmount > 0 && (
                     <div className="flex items-center gap-1.5 mt-2">
                       <Tag className="w-3 h-3 text-emerald-500" />
                       <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        Saved ${selectedRide.discountAmount}
+                        Saved {formatRwf(selectedRide.discountAmount)}
                       </span>
                     </div>
                   )}
