@@ -310,10 +310,29 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
   const handleMapClick = async ({ lat, lng }: { lat: number; lng: number }) => {
     if (!isPickingOnMap) return;
-    const address = await reverseGeocode(lat, lng);
-    if (isPickingOnMap === 'pickup') { setPickup(address); setPassengerLocation({ lat, lng }); }
-    else { setDestination(address); setDestinationLocation({ lat, lng }); }
+    const mode = isPickingOnMap;
     setIsPickingOnMap(null);
+
+    // Provide immediate feedback by setting coordinates and a placeholder address
+    const placeholder = "Resolving address...";
+    if (mode === 'pickup') {
+      setPassengerLocation({ lat, lng });
+      setPickup(placeholder);
+    } else {
+      setDestinationLocation({ lat, lng });
+      setDestination(placeholder);
+    }
+
+    try {
+      const address = await reverseGeocode(lat, lng);
+      if (mode === 'pickup') setPickup(address);
+      else setDestination(address);
+    } catch (error) {
+      console.error("Manual pick geocoding failed:", error);
+      const fallback = `Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+      if (mode === 'pickup') setPickup(fallback);
+      else setDestination(fallback);
+    }
   };
 
   useEffect(() => {
@@ -665,6 +684,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
                 showNearbyDrivers={activeRide.status === 'requested'}
                 showRouteControls={false}
                 onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                onMapClick={handleMapClick}
+                onToggleFavorite={handleToggleFavorite}
                 onRoutesGenerated={setAlternativeRoutes}
               />
             ) : (
@@ -783,6 +804,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
                           freezeViewport={false}
                           showNearbyDrivers={true}
                           onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                          onMapClick={handleMapClick}
+                          onToggleFavorite={handleToggleFavorite}
                           onRoutesGenerated={setAlternativeRoutes}
                         />
 
@@ -886,6 +909,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
                             height="400px"
                             showNearbyDrivers={activeRide.status === 'requested'}
                             onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                                 onMapClick={handleMapClick}
+                                 onToggleFavorite={handleToggleFavorite}
                             onRoutesGenerated={setAlternativeRoutes}
                           />
                         </div>
@@ -1149,7 +1174,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                                 </span>
                               )}
                             </div>
-                            <div className="rounded-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 dark:border-zinc-700/50 relative group h-[350px] md:h-[450px]">
+                            <div className={`rounded-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 dark:border-zinc-700/50 relative group h-[350px] md:h-[450px] ${isPickingOnMap ? 'cursor-crosshair' : ''}`}>
                               <MapComponent
                                 center={previewLocation || destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
                                 zoom={previewLocation ? 17 : 15}
@@ -1164,10 +1189,12 @@ export default function PassengerDashboard({ user, profile }: Props) {
                                 freezeViewport={false}
                                 showNearbyDrivers={true}
                                 onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                                 onMapClick={handleMapClick}
+                                 onToggleFavorite={handleToggleFavorite}
                                 onRoutesGenerated={setAlternativeRoutes}
                               />
                               {isPickingOnMap && (
-                                <div className="absolute top-4 left-4 right-16 z-10 bg-black/80 backdrop-blur-md rounded-2xl px-5 py-4 text-white shadow-2xl border border-white/10">
+                                <div className="absolute top-4 left-4 right-16 z-10 bg-black/80 backdrop-blur-md rounded-2xl px-5 py-4 text-white shadow-2xl border border-white/10 pointer-events-none">
                                   <p className="font-bold text-xs uppercase tracking-widest">Tap map to set {isPickingOnMap}</p>
                                   {(isPickingOnMap === 'pickup' && pickup) && <p className="mt-1 text-sm text-emerald-300 font-semibold truncate">{pickup}</p>}
                                   {(isPickingOnMap === 'destination' && destination) && <p className="mt-1 text-sm text-emerald-300 font-semibold truncate">{destination}</p>}
@@ -1412,14 +1439,51 @@ export default function PassengerDashboard({ user, profile }: Props) {
                               <div className="space-y-4">
                                 <h3 className="text-xs font-black text-gray-400 dark:text-zinc-500 uppercase tracking-[0.2em] px-2">Nearby Drivers</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {onlineRiders.slice(0, 4).map((rider) => (
-                                    <div key={rider.uid} className="bg-white/50 dark:bg-zinc-800/50 backdrop-blur-sm p-4 rounded-[2rem] border border-white/20 dark:border-zinc-700/50 flex items-center gap-4">
-                                      <div className="w-12 h-12 rounded-2xl bg-gray-200 dark:bg-zinc-700 overflow-hidden">
-                                        {rider.photoURL ? <img src={rider.photoURL} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold">R</div>}
+                                   {onlineRiders.slice(0, 4).map((rider) => (
+                                    <div key={rider.uid} className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm p-5 rounded-[2.5rem] border border-white/20 dark:border-zinc-700/50 flex items-center justify-between shadow-xl transition-all hover:scale-[1.02] group">
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-zinc-700 dark:to-zinc-800 overflow-hidden shadow-lg border border-white/20">
+                                          {rider.avatarUrl || rider.photoURL ? (
+                                            <img src={rider.avatarUrl || rider.photoURL} referrerPolicy="no-referrer" className="w-full h-full object-cover" alt="" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                              <UserIcon className="w-6 h-6 text-gray-400" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="font-black text-gray-900 dark:text-white text-lg">{rider.name}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex items-center gap-1 bg-amber-400/10 px-2 py-0.5 rounded-lg">
+                                              <Star className="w-3 h-3 text-amber-500 fill-current" />
+                                              <span className="text-[10px] font-black text-amber-600 dark:text-amber-400">{rider.rating || '5.0'}</span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{rider.vehicleType || 'Car'}</span>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div>
-                                        <p className="font-bold text-gray-900 dark:text-white">{rider.name}</p>
-                                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{rider.vehicleType} • {rider.rating}★</p>
+                                      
+                                      <div className="flex gap-2">
+                                        <motion.button
+                                          whileTap={{ scale: 0.9 }}
+                                          onClick={() => handleToggleFavorite(rider.uid)}
+                                          className={`p-3 rounded-xl transition-all ${profile.favoriteUserIds?.includes(rider.uid)
+                                            ? 'bg-red-50 dark:bg-red-500/10 text-red-500 shadow-lg shadow-red-500/10'
+                                            : 'bg-gray-50 dark:bg-zinc-700/50 text-gray-400 hover:text-red-500'
+                                          }`}
+                                        >
+                                          <Heart className={`w-5 h-5 ${profile.favoriteUserIds?.includes(rider.uid) ? 'fill-current' : ''}`} />
+                                        </motion.button>
+                                        
+                                        {rider.phoneNumber && (
+                                          <motion.a
+                                            whileTap={{ scale: 0.9 }}
+                                            href={`tel:${rider.phoneNumber}`}
+                                            className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-all shadow-lg shadow-emerald-500/10"
+                                          >
+                                            <Phone className="w-5 h-5" />
+                                          </motion.a>
+                                        )}
                                       </div>
                                     </div>
                                   ))}

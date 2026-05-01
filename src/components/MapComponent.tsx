@@ -2,7 +2,7 @@ import { GoogleMap, InfoWindowF, CircleF, useJsApiLoader, PolylineF, MarkerF } f
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../lib/firebase';
-import { Satellite, Map as MapIcon, Search, MapPin, Navigation, Clock, Route, ChevronDown, ChevronUp, AlertTriangle, Car, Bike, Footprints } from 'lucide-react';
+import { Satellite, Map as MapIcon, Search, MapPin, Navigation, Clock, Route, ChevronDown, ChevronUp, AlertTriangle, Car, Bike, Footprints, Phone, Heart } from 'lucide-react';
 
 interface MapMarker {
   id: string;
@@ -69,6 +69,7 @@ interface MapComponentProps {
   onPlaceSelected?: (place: Place) => void;
   onRouteSelected?: (route: MapRoute) => void;
   onRoutesGenerated?: (routes: MapRoute[]) => void;
+  onToggleFavorite?: (userId: string) => void;
   height?: string;
   showMapTypeControl?: boolean;
   showRouteControls?: boolean;
@@ -103,7 +104,8 @@ export default function MapComponent({
   height = '400px',
   showMapTypeControl = true,
   showRouteControls = true,
-  onRoutesGenerated
+  onRoutesGenerated,
+  onToggleFavorite
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
@@ -1215,13 +1217,32 @@ export default function MapComponent({
               {selectedMarker.profile && selectedMarker.profile.rating && (
                 <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">⭐ {selectedMarker.profile.rating}</p>
               )}
-              {selectedMarker.profile && selectedMarker.profile.phoneNumber && (
-                <a
-                  href={`tel:${selectedMarker.profile.phoneNumber}`}
-                  className="mt-2 block text-sm text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  📞 Call
-                </a>
+              {selectedMarker.profile && (
+                <div className="mt-3 flex items-center gap-2">
+                  {selectedMarker.profile.phoneNumber && (
+                    <a
+                      href={`tel:${selectedMarker.profile.phoneNumber}`}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-emerald-500 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 active:scale-95"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      Call
+                    </a>
+                  )}
+                  {/* Favorite toggle */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (selectedMarker.profile) {
+                        onToggleFavorite?.(selectedMarker.profile.uid);
+                      }
+                    }}
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all active:scale-95 ${
+                      selectedMarker.profile && onToggleFavorite ? 'hover:bg-red-100 bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <Heart className="w-4 h-4" />
+                  </button>
+                </div>
               )}
             </div>
           </InfoWindowF>
