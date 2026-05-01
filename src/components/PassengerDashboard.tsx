@@ -247,13 +247,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
         return;
       }
 
-      const estimatedRide =
-        rideEstimate ||
-        (await calculateRouteEstimate(resolvedPickup.location, resolvedDestination.location));
+      let estimatedRide = rideEstimate || (await calculateRouteEstimate(resolvedPickup.location, resolvedDestination.location));
 
       if (!estimatedRide) {
-        addNotification('Route unavailable', 'We could not calculate the trip distance right now.', 'error');
-        return;
+        // Fallback: If no route/distance found, use a minimum base fare
+        // This ensures the request can still be sent
+        estimatedRide = {
+          distanceMeters: 0,
+          durationSeconds: 0,
+          fareRwf: 1500 // Minimum base fare in RWF
+        };
       }
 
       setRideEstimate(estimatedRide);
@@ -344,18 +347,31 @@ export default function PassengerDashboard({ user, profile }: Props) {
   };
 
   const handleMapClick = async ({ lat, lng }: { lat: number; lng: number }) => {
-    if (!isPickingOnMap) return;
-    const mode = isPickingOnMap;
-    setIsPickingOnMap(null);
+    // If we are in an active ride, map clicks shouldn't change locations
+    if (activeRide) return;
+
+    // Determine what we are picking. 
+    // If isPickingOnMap is set, use it. 
+    // Otherwise, default to 'destination' if pickup is already set, or 'pickup' if it's not.
+    let mode = isPickingOnMap;
+    if (!mode) {
+      mode = (!passengerLocation) ? 'pickup' : 'destination';
+    }
+    
+    // Clear picking mode if it was explicitly set
+    if (isPickingOnMap) setIsPickingOnMap(null);
 
     // Provide immediate feedback by setting coordinates and a placeholder address
     const placeholder = "Resolving address...";
     if (mode === 'pickup') {
       setPassengerLocation({ lat, lng });
       setPickup(placeholder);
+      // If we were previewing something else, clear it
+      setPreviewLocation(null);
     } else {
       setDestinationLocation({ lat, lng });
       setDestination(placeholder);
+      setPreviewLocation(null);
     }
 
     try {
