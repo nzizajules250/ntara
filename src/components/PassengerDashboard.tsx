@@ -1031,7 +1031,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
               // ==================== DEFAULT RIDE REQUEST VIEW ====================
               return (
-              <div className="flex flex-col gap-6 h-full bg-slate-50 dark:bg-slate-950 p-4 md:p-6 transition-colors duration-500">
+              <div className="flex flex-col gap-6 h-full bg-slate-50 dark:bg-slate-950 p-0 sm:p-4 md:p-6 transition-colors duration-500">
                 {/* Tab Navigation */}
                 <div className="flex gap-2 p-2 bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-2xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
                   {[
@@ -1064,9 +1064,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       className="flex-1 flex flex-col md:gap-6 gap-0"
                     >
                       {/* MOBILE: Full-Screen Map with Overlay Card */}
-                      <div className="md:hidden flex-1 flex flex-col relative">
+                      <div className="md:hidden flex-1 flex flex-col relative min-h-[550px] h-[calc(100vh-12rem)]">
                         {/* Full-Screen Map Background */}
-                        <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl">
+                        <div className="absolute inset-0 rounded-[2rem] overflow-hidden shadow-2xl">
                           {passengerLocation || destinationLocation ? (
                             <MapComponent
                               center={destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
