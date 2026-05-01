@@ -11,9 +11,10 @@ export interface RouteDetails {
   distanceValue: number; // meters
   duration: string;
   durationValue: number; // seconds
-  steps: google.maps.DirectionsStep[];
+  steps: any[]; // Generalized steps
   polyline: string;
   overviewPath: { lat: number; lng: number }[];
+  source?: 'google' | 'osrm';
 }
 
 export interface PlaceDetails {
@@ -444,6 +445,135 @@ export function getDistanceBetween(
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
   return R * c;
+}
+
+/**
+ * Get route details combining OSRM and Google Maps
+ * Uses OSRM as primary for routing logic and Google as fallback
+ */
+export async function getCombinedRouteDetails(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  waypoints: { lat: number; lng: number }[] = [],
+  profile: 'driving' | 'walking' | 'cycling' = 'driving'
+): Promise<RouteDetails | null> {
+  // Try OSRM first
+  const osrmRoute = await getOSRMRouteDetails(origin, destination, waypoints, profile);
+  if (osrmRoute) {
+    return osrmRoute;
+  }
+
+  // Fallback to Google Maps
+  console.log('OSRM routing failed, falling back to Google Maps');
+  return getRouteDetails(origin, destination, waypoints);
+}
+
+/**
+ * Get route details using OSRM (OpenStreetMap)
+ */
+export async function getOSRMRouteDetails(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  waypoints: { lat: number; lng: number }[] = [],
+  profile: 'driving' | 'walking' | 'cycling' = 'driving'
+): Promise<RouteDetails | null> {
+  try {
+    const profileMap = {
+      driving: 'driving',
+      walking: 'foot',
+      cycling: 'bicycle'
+    };
+    
+    const osrmProfile = profileMap[profile] || 'driving';
+    
+    // Combine origin, waypoints, and destination into a single coordinate string
+    const points = [origin, ...waypoints, destination]
+      .map(p => `${p.lng},${p.lat}`)
+      .join(';');
+      
+    const url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${points}?overview=full&geometries=polyline&steps=true`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.code !== 'Ok' || !data.routes?.[0]) {
+      return null;
+    }
+    
+    const route = data.routes[0];
+    const decodedPath = decodePolyline(route.geometry);
+    
+    // Extract steps from all legs
+    const steps = route.legs.flatMap((leg: any) => 
+      leg.steps.map((step: any) => ({
+        instructions: step.maneuver?.instruction || step.name || 'Proceed',
+        distance: formatDistance(step.distance),
+        duration: formatDuration(step.duration),
+        maneuver: step.maneuver?.type || ''
+      }))
+    );
+    
+    return {
+      distance: formatDistance(route.distance),
+      distanceValue: route.distance,
+      duration: formatDuration(route.duration),
+      durationValue: route.duration,
+      steps: steps,
+      polyline: route.geometry,
+      overviewPath: decodedPath,
+      source: 'osrm'
+    };
+  } catch (error) {
+    console.error('Error fetching OSRM route:', error);
+    return null;
+  }
+}
+
+/**
+ * Decode OSRM polyline string into coordinates
+ */
+export function decodePolyline(str: string, precision: number = 5) {
+  let index = 0,
+    lat = 0,
+    lng = 0,
+    coordinates = [],
+    shift = 0,
+    result = 0,
+    byte = null,
+    latitude_change,
+    longitude_change,
+    factor = Math.pow(10, precision);
+
+  while (index < str.length) {
+    byte = null;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
+
+    lat += latitude_change;
+    lng += longitude_change;
+
+    coordinates.push({ lat: lat / factor, lng: lng / factor });
+  }
+
+  return coordinates;
 }

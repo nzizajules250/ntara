@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../lib/firebase';
 import { Satellite, Map as MapIcon, Search, MapPin, Navigation, Clock, Route, ChevronDown, ChevronUp, AlertTriangle, Car, Bike, Footprints, Phone, Heart } from 'lucide-react';
+import { getCombinedRouteDetails } from '../lib/mapUtils';
 
 interface MapMarker {
   id: string;
@@ -247,45 +248,6 @@ export default function MapComponent({
     return `${minutes}min`;
   };
 
-  const requestDirections = useCallback(
-    async (
-      directionsService: google.maps.DirectionsService,
-      request: MapDirectionsRequest,
-      travelMode: google.maps.TravelMode,
-      provideAlternatives: boolean
-    ) => {
-      const routeRequest: google.maps.DirectionsRequest = {
-        origin: request.origin,
-        destination: request.destination,
-        waypoints: request.waypoints?.map((point) => ({
-          location: point,
-          stopover: true
-        })),
-        travelMode,
-        optimizeWaypoints: true,
-        provideRouteAlternatives: provideAlternatives
-      };
-
-      try {
-        return await directionsService.route(routeRequest);
-      } catch (error) {
-        const shouldFallbackToDriving =
-          travelMode === window.google.maps.TravelMode.BICYCLING ||
-          travelMode === ('BICYCLING' as google.maps.TravelMode);
-
-        if (!shouldFallbackToDriving) {
-          throw error;
-        }
-
-        console.warn('Bicycling directions unavailable, retrying with driving directions.', error);
-        return directionsService.route({
-          ...routeRequest,
-          travelMode: window.google.maps.TravelMode.DRIVING
-        });
-      }
-    },
-    []
-  );
 
   // Initialize Places Service
   useEffect(() => {
@@ -570,15 +532,9 @@ export default function MapComponent({
     };
   }, [isLoaded, map, markers, onMarkerClick]);
 
-  // Enhanced route generation with alternatives and step-by-step directions
+  // Modular route generation using combined OSRM/Google service
   useEffect(() => {
     let cancelled = false;
-
-    if (!isLoaded || !window.google?.maps?.DirectionsService) {
-      setIsLoadingRoutes(false);
-      setGeneratedRoutes([]);
-      return;
-    }
 
     const hasValidPoint = (point: { lat: number; lng: number }) =>
       Number.isFinite(point.lat) &&
@@ -599,67 +555,48 @@ export default function MapComponent({
       return;
     }
 
-    const directionsService = new window.google.maps.DirectionsService();
     setIsLoadingRoutes(true);
 
     Promise.all(
       validRequests.map(async (request) => {
+        const profileMap: Record<string, 'driving' | 'walking' | 'cycling'> = {
+          DRIVING: 'driving',
+          WALKING: 'walking',
+          BICYCLING: 'cycling'
+        };
         const travelMode = request.travelMode || selectedTravelMode;
-        const provideAlternatives = request.provideRouteAlternatives ?? showRouteAlternatives;
+        const profile = profileMap[travelMode as string] || 'driving';
 
-        const result = await requestDirections(
-          directionsService,
-          request,
-          travelMode,
-          provideAlternatives
+        const result = await getCombinedRouteDetails(
+          request.origin,
+          request.destination,
+          request.waypoints,
+          profile
         );
 
-        if (!result || result.routes.length === 0) {
+        if (!result) {
           return [];
         }
 
-        // Process all routes (including alternatives)
-        return result.routes.map((route, routeIndex) => {
-          const overviewPath = route.overview_path ?? [];
-          const leg = route.legs[0];
-          
-          // Extract step-by-step directions
-          const steps: RouteStep[] = (leg?.steps || []).map(step => ({
-            instructions: step.instructions || '',
-            distance: step.distance?.text || '',
-            duration: step.duration?.text || '',
-            maneuver: step.maneuver || ''
-          }));
-
-          return {
-            id: routeIndex === 0 ? request.id : `${request.id}-alt-${routeIndex}`,
-            color: getRouteColor(routeIndex, request.color),
-            points: overviewPath.map((point) => ({
-              lat: point.lat(),
-              lng: point.lng()
-            })),
-            distance: leg?.distance?.value || 0,
-            duration: leg?.duration?.value || 0,
-            summary: route.summary || '',
-            warnings: route.warnings || [],
-            steps: steps,
-            label: routeIndex === 0 ? 'Fastest Route' : `Alternative ${routeIndex}`,
-            isActive: false
-          } as MapRoute;
-        });
+        return [{
+          id: request.id,
+          color: request.color || '#3b82f6',
+          points: result.overviewPath,
+          distance: result.distanceValue,
+          duration: result.durationValue,
+          summary: result.source === 'osrm' ? 'OSRM Route' : 'Google Route',
+          steps: result.steps,
+          isActive: true
+        } as MapRoute];
       })
     )
       .then((routeArrays) => {
         if (!cancelled) {
-          // Flatten array of arrays and filter valid routes
           const allRoutes = routeArrays
             .flat()
             .filter((route): route is MapRoute => 
               route !== null && route.points.length > 0
             );
-          
-          // Sort by duration (fastest first)
-          allRoutes.sort((a, b) => (a.duration || 0) - (b.duration || 0));
           
           setGeneratedRoutes(allRoutes);
 
@@ -692,7 +629,7 @@ export default function MapComponent({
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, directionsKey, selectedTravelMode, showRouteAlternatives, activeRouteId, onRouteSelected, requestDirections]);
+  }, [directionRequests.length, directionsKey, selectedTravelMode, showRouteAlternatives, activeRouteId, onRouteSelected]);
 
   const displayedRoutes = [...routes, ...generatedRoutes];
   const displayedRoutesKey = JSON.stringify(
@@ -766,6 +703,55 @@ export default function MapComponent({
 
   return (
     <div className="relative" style={{ height, touchAction: 'pan-x pan-y' }}>
+      {/* Map Controls */}
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+        {/* Map Type Switcher */}
+        <div className="flex flex-col gap-1 rounded-xl bg-white/95 p-1.5 shadow-lg backdrop-blur-sm dark:bg-zinc-900/95">
+          <button
+            onClick={() => setMapType('roadmap')}
+            className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${mapType === 'roadmap' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+            title="Road Map"
+          >
+            <MapIcon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setMapType('satellite')}
+            className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${mapType === 'satellite' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+            title="Satellite"
+          >
+            <Satellite className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setMapType('hybrid')}
+            className={`flex h-10 w-10 items-center justify-center rounded-lg transition-all ${mapType === 'hybrid' ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}
+            title="Hybrid"
+          >
+            <div className="relative">
+              <Satellite className="w-5 h-5" />
+              <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-blue-500 dark:border-zinc-900" />
+            </div>
+          </button>
+        </div>
+
+        {/* Traffic Toggle */}
+        <button
+          onClick={() => setShowTraffic(!showTraffic)}
+          className={`flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 shadow-lg backdrop-blur-sm transition-all dark:bg-zinc-900/95 ${showTraffic ? 'text-emerald-500 ring-2 ring-emerald-500/50' : 'text-gray-500 dark:text-zinc-400'}`}
+          title="Traffic"
+        >
+          <Route className="w-5 h-5" />
+        </button>
+
+        {/* Locate Me */}
+        <button
+          onClick={handleLocateMe}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 text-blue-500 shadow-lg backdrop-blur-sm transition-all hover:bg-gray-50 dark:bg-zinc-900/95 dark:hover:bg-zinc-800"
+          title="My Location"
+        >
+          <Navigation className="w-5 h-5" />
+        </button>
+      </div>
+
       {/* Place Search Bar with Autocomplete */}
       {showPlaces && (
         <div className="absolute top-4 left-4 z-20 w-80">
@@ -1119,6 +1105,8 @@ export default function MapComponent({
           scrollwheel: true,
           tilt: is3DMode ? 45 : 0,
           heading: is3DMode ? 90 : 0,
+          clickableIcons: false,
+          draggableCursor: onMapClick ? 'crosshair' : undefined,
           styles: [
             {
               featureType: 'poi',

@@ -73,6 +73,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [locationNameToSave, setLocationNameToSave] = useState('');
   const [isSavingLocation, setIsSavingLocation] = useState(false);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
+  const [isCardMinimized, setIsCardMinimized] = useState(false);
   const [rideEstimate, setRideEstimate] = useState<RideEstimate | null>(null);
   const [isCalculatingEstimate, setIsCalculatingEstimate] = useState(false);
   const [isResolvingPickupLocation, setIsResolvingPickupLocation] = useState(false);
@@ -647,495 +648,41 @@ export default function PassengerDashboard({ user, profile }: Props) {
         </div>
       </motion.div>
     );
-  }
 
-  if (activeRide) {
-    const ridePickupLocation = passengerLocation || (hasValidCoordinates(activeRide.pickup) ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng } : null);
-    const focusedNearbyDriver = nearbyDrivers.find((driver) => driver.uid === selectedNearbyRiderId && hasValidCoordinates(driver.currentLocation)) || null;
-    const waitingForRiderStart = activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && !activeRide.riderConfirmedStart;
-    const waitingForRiderEndSignal = activeRide.status === 'ongoing' && !activeRide.riderConfirmedEnd;
-    const rideDestination = hasValidCoordinates(activeRide.destination) ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng } : null;
-    const activeRideDirectionRequests = [
-      ...(activeRide.status === 'requested' && ridePickupLocation && rideDestination ? [{ id: `passenger-requested-trip-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
-      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && riderProfile?.currentLocation && ridePickupLocation ? [{ id: `passenger-driver-to-pickup-${activeRide.id}`, origin: riderProfile.currentLocation, destination: ridePickupLocation, color: '#10b981', provideRouteAlternatives: true }] : []),
-      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && ridePickupLocation && rideDestination ? [{ id: `passenger-pickup-to-destination-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
-      ...(activeRide.status === 'ongoing' && riderProfile?.currentLocation && rideDestination ? [{ id: `passenger-live-trip-${activeRide.id}`, origin: riderProfile.currentLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : [])
-    ];
+  const ridePickupLocation = activeRide ? (passengerLocation || (hasValidCoordinates(activeRide.pickup) ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng } : null)) : null;
+  const focusedNearbyDriver = activeRide ? (nearbyDrivers.find((driver) => driver.uid === selectedNearbyRiderId && hasValidCoordinates(driver.currentLocation)) || null) : null;
+  const waitingForRiderStart = activeRide ? (activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && !activeRide.riderConfirmedStart) : false;
+  const waitingForRiderEndSignal = activeRide ? (activeRide.status === 'ongoing' && !activeRide.riderConfirmedEnd) : false;
+  const rideDestination = activeRide ? (hasValidCoordinates(activeRide.destination) ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng } : null) : null;
+  const activeRideDirectionRequests = activeRide ? [
+    ...(activeRide.status === 'requested' && ridePickupLocation && rideDestination ? [{ id: `passenger-requested-trip-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
+    ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && riderProfile?.currentLocation && ridePickupLocation ? [{ id: `passenger-driver-to-pickup-${activeRide.id}`, origin: riderProfile.currentLocation, destination: ridePickupLocation, color: '#10b981', provideRouteAlternatives: true }] : []),
+    ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && ridePickupLocation && rideDestination ? [{ id: `passenger-pickup-to-destination-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
+    ...(activeRide.status === 'ongoing' && riderProfile?.currentLocation && rideDestination ? [{ id: `passenger-live-trip-${activeRide.id}`, origin: riderProfile.currentLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : [])
+  ] : [];
 
-    return (
-      <>
-        {/* MOBILE: Full-Screen Map with Overlay */}
-        <div className="md:hidden relative -mx-2 sm:-mx-3 -mt-2 sm:-mt-3 min-h-[calc(100vh-5rem)] overflow-hidden bg-gradient-to-b from-slate-900 to-purple-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem]">
-          {/* Full-Screen Map Background */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden">
-            {ridePickupLocation ? (
-              <MapComponent
-                markers={[
-                  { id: 'passenger', position: ridePickupLocation, label: 'You', type: 'passenger' },
-                  ...(riderProfile?.currentLocation ? [{ id: riderProfile.uid, position: riderProfile.currentLocation, label: riderProfile.name, type: 'rider' as const, profile: riderProfile }] : []),
-                  ...(hasValidCoordinates(activeRide.destination) ? [{ id: 'destination', position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng }, label: activeRide.destination.address || 'Destination', type: 'destination' as const }] : []),
-                  ...(activeRide.status === 'requested' ? nearbyDrivers.filter(d => d.currentLocation).map(driver => ({ id: driver.uid, position: driver.currentLocation!, label: driver.name, type: 'nearby' as const, profile: driver })) : [])
-                ]}
-                directionRequests={activeRideDirectionRequests}
-                center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
-                zoom={15}
-                height="100%"
-                freezeViewport={false}
-                showNearbyDrivers={activeRide.status === 'requested'}
-                showRouteControls={false}
-                onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
-                onMapClick={handleMapClick}
-                onToggleFavorite={handleToggleFavorite}
-                onRoutesGenerated={setAlternativeRoutes}
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-slate-900 to-purple-950 flex items-center justify-center">
-                <div className="text-center">
-                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3" />
-                  <p className="text-white/50 font-medium">Loading map...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-slate-950/90 via-slate-900/50 to-transparent z-0" />
-
-          {/* Overlay Card - COLLAPSIBLE */}
-            <AnimatePresence>
-              {!isCardExpanded ? (
-                // COLLAPSED STATE - Minimal bar
-                  <motion.div
-                    key="collapsed"
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 100, opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="absolute bottom-4 sm:bottom-6 left-3 sm:left-4 right-3 sm:right-4 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/95 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] backdrop-blur-2xl dark:border-zinc-700/50 dark:bg-zinc-900/95 z-10"
-                  >
-                  <button
-                    onClick={() => setIsCardExpanded(true)}
-                    className="w-full p-4 sm:p-5"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1 text-left">
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <div className="h-1.5 w-12 rounded-full bg-gray-200 dark:bg-zinc-700" />
-                          <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${activeRide.status === 'requested'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-                            : activeRide.status === 'accepted'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                              : activeRide.status === 'arrived'
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-                                : 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400'
-                            }`}>
-                            <span className={`h-2 w-2 rounded-full ${activeRide.status === 'requested'
-                              ? 'bg-amber-500 animate-pulse'
-                              : activeRide.status === 'accepted'
-                                ? 'bg-blue-500 animate-pulse'
-                                : activeRide.status === 'arrived'
-                                  ? 'bg-emerald-500'
-                                  : 'bg-violet-500'
-                              }`} />
-                            {activeRide.status === 'requested' ? t('findingRider') || 'Finding Rider' :
-                              activeRide.status === 'accepted' ? t('riderOnWay') || 'Rider On Way' :
-                                activeRide.status === 'arrived' ? t('riderArrivedNotify') || 'Rider Arrived' :
-                                  'Trip Ongoing'}
-                          </div>
-                          {eta !== null && activeRide.status === 'accepted' && (
-                            <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                              <Timer className="h-3 w-3" />
-                              {eta} min
-                            </div>
-                          )}
-                        </div>
-
-                        {riderProfile ? (
-                          <div className="flex items-center gap-4 mt-2">
-                            {riderProfile.avatarUrl ? (
-                              <img src={riderProfile.avatarUrl} referrerPolicy="no-referrer" className="h-12 w-12 rounded-full object-cover ring-2 ring-white dark:ring-zinc-800 shadow-md" alt="" />
-                            ) : (
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-600 shadow-md">
-                                <UserIcon className="h-6 w-6 text-white" />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-base font-black text-gray-900 dark:text-white">{riderProfile.name}</p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-3.5 w-3.5 text-amber-400 fill-current" />
-                                  <span className="text-xs font-bold text-gray-600 dark:text-zinc-400">{riderProfile.rating}</span>
-                                </div>
-                                <span className="text-gray-300 dark:text-zinc-600">•</span>
-                                <span className="text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider">{riderProfile.vehicleModel || 'Vehicle'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-[auto,1fr] items-start gap-x-4 gap-y-3 mt-2">
-                            <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/20">
-                              <MapPin className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeRide.pickup.address}</p>
-                            </div>
-                            <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-500/20">
-                              <Navigation className="h-3 w-3 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-gray-900 dark:text-white">{activeRide.destination.address}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* DESKTOP: Persistent Map Side */}
-                      <div className="hidden md:block md:col-span-7 relative h-full min-h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 dark:border-zinc-700/50">
-                        <MapComponent
-                          center={previewLocation || destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
-                          zoom={previewLocation ? 17 : 15}
-                          markers={[
-                            ...(previewLocation ? [{ id: 'preview', position: previewLocation, label: 'Preview', type: 'place' as const }] : []),
-                            ...(passengerLocation ? [{ id: 'passenger', position: passengerLocation, label: 'You', type: 'passenger' as const }] : []),
-                            ...(destinationLocation ? [{ id: 'destination', position: destinationLocation, label: 'Destination', type: 'destination' as const }] : []),
-                            ...onlineRiders.filter(r => hasValidCoordinates(r.currentLocation)).map(rider => ({ id: rider.uid, position: rider.currentLocation!, label: rider.name, type: 'nearby' as const, profile: rider }))
-                          ]}
-                          directionRequests={passengerLocation && destinationLocation ? [{ id: 'route', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6', provideRouteAlternatives: true }] : []}
-                          height="100%"
-                          freezeViewport={false}
-                          showNearbyDrivers={true}
-                          onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
-                          onMapClick={handleMapClick}
-                          onToggleFavorite={handleToggleFavorite}
-                          onRoutesGenerated={setAlternativeRoutes}
-                        />
-
-                        {/* Floating Status Indicator */}
-                        {onlineRiders.length > 0 && (
-                          <div className="absolute top-6 left-6 z-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl px-4 py-2 rounded-2xl shadow-xl border border-white/20 dark:border-zinc-700/50 flex items-center gap-3">
-                            <div className="flex -space-x-2">
-                              {onlineRiders.slice(0, 3).map(rider => (
-                                <div key={rider.uid} className="w-8 h-8 rounded-full border-2 border-white dark:border-zinc-800 bg-gray-200 overflow-hidden">
-                                  {rider.photoURL ? <img src={rider.photoURL} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">R</div>}
-                                </div>
-                              ))}
-                            </div>
-                            <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                              {onlineRiders.length} {t('online') || 'Active Drivers'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="shrink-0 rounded-full bg-gray-50 p-2 dark:bg-zinc-800 shadow-inner">
-                        <ChevronRight className="h-6 w-6 text-gray-400 dark:text-zinc-400 transform -rotate-90 transition-transform" />
-                      </div>
-                    </div>
-                  </button>
-                </motion.div>
-              ) : (
-                // EXPANDED STATE - Full details
-                  <motion.div
-                    key="expanded"
-                    initial={{ y: "100%", opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: "100%", opacity: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="absolute bottom-0 left-0 right-0 max-h-[90vh] overflow-y-auto rounded-t-[2rem] sm:rounded-t-[2.5rem] border-t border-white/20 bg-white/95 shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.5)] backdrop-blur-3xl dark:border-zinc-700/50 dark:bg-zinc-900/95 pb-6 z-10"
-                  >
-                  <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md pt-4 pb-2 px-6 flex flex-col items-center border-b border-gray-100 dark:border-zinc-800">
-                    <div className="h-1.5 w-16 rounded-full bg-gray-300 dark:bg-zinc-600 mb-4" />
-                    <div className="w-full flex items-center justify-between">
-                      <h3 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">Trip Details</h3>
-                      <button
-                        onClick={() => setIsCardExpanded(false)}
-                        className="p-2 rounded-full bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
-                      >
-                        <X className="w-5 h-5 text-gray-500 dark:text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6 p-6">
-                    {/* Status Banner */}
-                    <div className="relative overflow-hidden flex items-center justify-between bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 border border-purple-500/30 shadow-xl">
-                      <div className="absolute inset-0 opacity-30 pointer-events-none">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
-                        <div className="absolute top-1/2 left-1/2 w-32 h-32 bg-purple-300 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl" />
-                      </div>
-                      
-                      <div className="relative z-10 flex flex-col gap-2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/10 w-fit">
-                          <div className={`w-2 h-2 rounded-full ${
-                            activeRide.status === 'requested' ? 'bg-amber-400 animate-pulse' : 
-                            activeRide.status === 'accepted' ? 'bg-blue-400 animate-pulse' :
-                            'bg-emerald-400'
-                          }`} />
-                          <span className="text-[10px] font-black text-white uppercase tracking-widest">{activeRide.status}</span>
-                        </div>
-                        <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
-                          {activeRide.status === 'requested' ? t('findingRider') || 'Finding Rider' : 
-                           activeRide.status === 'accepted' ? t('riderOnWay') || 'Rider on Way' : 
-                           activeRide.status === 'arrived' ? (activeRide.passengerConfirmedArrival ? t('arrivingSoon') || 'Arriving Soon' : t('riderArrivedNotify') || 'Rider Arrived') : 
-                           t('tripStartedNotify') || 'Trip Started'}
-                        </h2>
-                      </div>
-                      
-                      {eta !== null && activeRide.status === 'accepted' && (
-                        <div className="relative z-10 bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/10 flex flex-col items-center">
-                          <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-0.5">ETA</p>
-                          <p className="text-2xl sm:text-3xl font-black text-white">{eta} <span className="text-sm font-bold">min</span></p>
-                        </div>
-                      )}
-                    </div>
-
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[3rem] shadow-2xl border border-white/20 dark:border-zinc-700/50 overflow-hidden"
-                    >
-                      {/* Map */}
-                      {ridePickupLocation && (
-                        <div className="relative">
-                          <MapComponent
-                            markers={[
-                              { id: 'passenger', position: ridePickupLocation, label: 'You', type: 'passenger' },
-                              ...(riderProfile?.currentLocation ? [{ id: riderProfile.uid, position: riderProfile.currentLocation, label: riderProfile.name, type: 'rider' as const, profile: riderProfile }] : []),
-                              ...(hasValidCoordinates(activeRide.destination) ? [{ id: 'destination', position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng }, label: activeRide.destination.address || 'Destination', type: 'destination' as const }] : []),
-                              ...(activeRide.status === 'requested' ? nearbyDrivers.filter(d => d.currentLocation).map(driver => ({ id: driver.uid, position: driver.currentLocation!, label: driver.name, type: 'nearby' as const, profile: driver })) : [])
-                            ]}
-                            directionRequests={activeRideDirectionRequests}
-                            center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
-                            zoom={15}
-                            height="400px"
-                            showNearbyDrivers={activeRide.status === 'requested'}
-                            onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
-                                 onMapClick={handleMapClick}
-                                 onToggleFavorite={handleToggleFavorite}
-                            onRoutesGenerated={setAlternativeRoutes}
-                          />
-                        </div>
-                      )}
-
-                      <div className="p-8 space-y-6">
-                        {/* Rider Info Card */}
-                        {riderProfile && (
-                          <div className="flex items-center justify-between p-5 bg-gradient-to-br from-gray-50 to-white dark:from-zinc-800 dark:to-zinc-800/50 rounded-[2.5rem] border border-gray-100 dark:border-zinc-700 shadow-xl">
-                            <div className="flex items-center gap-4">
-                              {riderProfile.avatarUrl ? (
-                                <img src={riderProfile.avatarUrl} referrerPolicy="no-referrer" className="w-16 h-16 rounded-2xl ring-4 ring-white dark:ring-zinc-700 shadow-2xl object-cover" alt="" />
-                              ) : (
-                                <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-2xl">
-                                  <UserIcon className="w-8 h-8 text-white" />
-                                </div>
-                              )}
-                              <div>
-                                <p className="font-black text-lg text-gray-900 dark:text-white">{riderProfile.name}</p>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <div className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-500/10 px-3 py-1 rounded-xl">
-                                    <Star className="w-4 h-4 text-amber-400 fill-current" />
-                                    <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{riderProfile.rating}</span>
-                                  </div>
-                                  {riderProfile.vehicleModel && (
-                                    <span className="text-sm text-gray-400 font-semibold">{riderProfile.vehicleModel} • {riderProfile.numberPlate}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-3">
-                              <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleToggleFavorite(riderProfile.uid)}
-                                className={`p-3.5 rounded-2xl transition-all ${profile.favoriteUserIds?.includes(riderProfile.uid)
-                                  ? 'bg-red-50 dark:bg-red-500/10 text-red-500 shadow-lg shadow-red-500/20'
-                                  : 'bg-white dark:bg-zinc-700 text-gray-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500'
-                                  }`}
-                              >
-                                <Heart className={`w-6 h-6 ${profile.favoriteUserIds?.includes(riderProfile.uid) ? 'fill-current' : ''}`} />
-                              </motion.button>
-                              <motion.a
-                                whileTap={{ scale: 0.9 }}
-                                href={`tel:${riderProfile.phoneNumber}`}
-                                className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all shadow-lg shadow-emerald-500/20"
-                              >
-                                <Phone className="w-6 h-6" />
-                              </motion.a>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Locations */}
-                        <div className="space-y-4">
-                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-500/10 dark:to-emerald-500/10 border border-green-100 dark:border-green-500/20">
-                            <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-xl shadow-green-500/30">
-                              <MapPin className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-green-600 dark:text-green-400 uppercase tracking-widest mb-1">Pickup Location</p>
-                              <p className="text-base font-bold text-gray-900 dark:text-white leading-snug">{activeRide.pickup.address}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-500/10 dark:to-rose-500/10 border border-red-100 dark:border-red-500/20">
-                            <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center shadow-xl shadow-red-500/30">
-                              <Navigation className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1">Destination</p>
-                              <p className="text-base font-bold text-gray-900 dark:text-white leading-snug">{activeRide.destination.address}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {activeRide.fare > 0 && (
-                          <div className="flex items-start gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-500/10 dark:to-green-500/10 border border-emerald-100 dark:border-emerald-500/20">
-                            <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-xl shadow-emerald-500/30">
-                              <CheckCircle2 className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">Fare</p>
-                              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatRwf(activeRide.fare)}</p>
-                              {activeRide.routeDistanceMeters ? (
-                                <p className="text-sm font-semibold text-gray-500 dark:text-zinc-400 mt-1">{formatDistanceKm(activeRide.routeDistanceMeters)}</p>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
-                          {activeRide.status === 'arrived' && !activeRide.passengerConfirmedArrival && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmArrival}
-                                className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-5 rounded-2xl font-bold shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3">
-                                <CheckCircle2 className="w-6 h-6" />Confirm Driver Arrival
-                              </motion.button>
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleRejectArrival}
-                                className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-5 rounded-2xl font-bold border-2 border-red-200 dark:border-red-500/30 flex items-center justify-center gap-3">
-                                <X className="w-6 h-6" />Rider Not Here
-                              </motion.button>
-                            </div>
-                          )}
-
-                          {waitingForRiderStart && (
-                            <div className="p-5 bg-amber-50 dark:bg-amber-500/10 rounded-2xl border border-amber-200 dark:border-amber-500/30 text-base text-amber-600 dark:text-amber-400 font-semibold text-center">
-                              <Loader2 className="w-5 h-5 animate-spin inline mr-3" />
-                              Waiting for rider to confirm trip start...
-                            </div>
-                          )}
-
-                          {activeRide.status === 'arrived' && activeRide.passengerConfirmedArrival && activeRide.riderConfirmedStart && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmStart}
-                                className="bg-black dark:bg-white text-white dark:text-black py-5 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3">
-                                <Navigation2 className="w-6 h-6" />Confirm Start
-                              </motion.button>
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleRejectStart}
-                                className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-gray-400 py-5 rounded-2xl font-bold">
-                                Reject
-                              </motion.button>
-                            </div>
-                          )}
-
-                          {activeRide.status === 'ongoing' && activeRide.riderConfirmedEnd && (
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmReached}
-                                className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-5 rounded-2xl font-bold shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3">
-                                <Award className="w-6 h-6" />Confirm Arrival
-                              </motion.button>
-                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleRejectReached}
-                                className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-5 rounded-2xl font-bold border-2 border-red-200 dark:border-red-500/30">
-                                Not Yet
-                              </motion.button>
-                            </div>
-                          )}
-
-                          {['requested', 'accepted', 'arrived'].includes(activeRide.status) && (
-                            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => setShowCancelModal(true)}
-                              className="w-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-5 rounded-2xl font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-all border-2 border-red-200 dark:border-red-500/30">
-                              Cancel Ride
-                            </motion.button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Cancel Modal */}
-                  <AnimatePresence>
-                    {showCancelModal && (
-                      <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-                          onClick={() => setShowCancelModal(false)}
-                        />
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                          className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl w-full max-w-sm rounded-[3rem] p-8 relative z-10 shadow-2xl border border-white/20 dark:border-zinc-700/50"
-                        >
-                          <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 shadow-xl">
-                            <X className="w-8 h-8 text-red-500" />
-                          </div>
-                          <h3 className="text-2xl font-black mb-3 text-gray-900 dark:text-white">{t('cancelRideTitle')}</h3>
-                          <p className="text-gray-500 dark:text-zinc-400 mb-6">{t('cancelRideDesc')}</p>
-                          <textarea
-                            value={cancelReason}
-                            onChange={(e) => setCancelReason(e.target.value)}
-                            placeholder={t('cancelPlaceholder')}
-                            className="w-full bg-gray-50 dark:bg-zinc-800 rounded-2xl p-4 border-2 border-transparent focus:border-red-500 outline-none mb-6 resize-none font-medium"
-                            rows={3}
-                          />
-                          <div className="flex gap-4">
-                            <button
-                              onClick={() => setShowCancelModal(false)}
-                              className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                              Keep
-                            </button>
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={handleCancelRide}
-                              disabled={isCancelling}
-                              className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-red-500/30"
-                            >
-                              {isCancelling ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Cancel'}
-                            </motion.button>
-                          </div>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </>
-              );
-  }
-
-              // ==================== DEFAULT RIDE REQUEST VIEW ====================
-              return (
-              <div className="flex flex-col gap-4 md:gap-6 h-full bg-slate-50 dark:bg-slate-950 p-2 sm:p-4 md:p-6 transition-colors duration-500">
-                {/* Tab Navigation */}
-                <div className="flex gap-1.5 p-1.5 bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-2xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
-                  {[
-                    { key: 'ride' as const, label: t('rides') || 'Request', icon: MapIcon },
-                    { key: 'reports' as const, label: t('reports') || 'Reports', icon: FileText },
-                    { key: 'analytics' as const, label: t('analytics') || 'Analytics', icon: BarChart3 }
-                  ].map((tab) => (
-                    <motion.button
-                      key={tab.key}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setViewMode(tab.key)}
-                      className={`flex-1 py-3 sm:py-3.5 px-2 sm:px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 ${viewMode === tab.key
-                        ? 'bg-white/80 dark:bg-white/20 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
-                        }`}
-                    >
-                      <tab.icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      <span className="text-[9px] sm:text-sm font-black uppercase tracking-wider truncate">{tab.label}</span>
-                    </motion.button>
+  // ==================== MAIN RENDER ====================
+  return (
+    <div className="flex flex-col gap-4 md:gap-6 h-full bg-slate-50 dark:bg-slate-950 p-2 sm:p-4 md:p-6 transition-colors duration-500">
+      {/* Tab Navigation */}
+      <div className="flex gap-1.5 p-1.5 bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-2xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500 z-[60]">
+        {[
+          { key: 'ride' as const, label: t('rides') || 'Request', icon: MapIcon },
+          { key: 'reports' as const, label: t('reports') || 'Reports', icon: FileText },
+          { key: 'analytics' as const, label: t('analytics') || 'Analytics', icon: BarChart3 }
+        ].map((tab) => (
+          <motion.button
+            key={tab.key}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setViewMode(tab.key)}
+            className={`flex-1 py-3 sm:py-3.5 px-2 sm:px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 ${viewMode === tab.key
+              ? 'bg-white/80 dark:bg-white/20 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
+              }`}
+          >
+            <tab.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[9px] sm:text-sm font-black uppercase tracking-wider truncate">{tab.label}</span>
+          </motion.button>
                   ))}
                 </div>
 
@@ -1146,10 +693,301 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="flex-1 flex flex-col gap-6 overflow-hidden"
+                      className="flex-1 flex flex-col gap-6 overflow-hidden relative"
                     >
-                      {/* INTEGRATED LAYOUT: Map-First Approach */}
-                      <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+                      {activeRide ? (
+                        <>
+                          {/* ADAPTIVE LAYOUT: Map-First Approach for Active Ride */}
+                          <div className="relative -mx-2 sm:-mx-3 -mt-2 sm:-mt-3 min-h-[calc(100vh-10rem)] md:min-h-0 md:h-[calc(100vh-12rem)] md:m-0 overflow-hidden bg-slate-50 dark:bg-slate-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem] md:rounded-[3rem] transition-all duration-500">
+                            {/* Full-Screen Map Background */}
+                            <div className="absolute inset-0 w-full h-full overflow-hidden">
+                              {ridePickupLocation ? (
+                                <MapComponent
+                                  markers={[
+                                    { id: 'passenger', position: ridePickupLocation, label: 'You', type: 'passenger' },
+                                    ...(riderProfile?.currentLocation ? [{ id: riderProfile.uid, position: riderProfile.currentLocation, label: riderProfile.name, type: 'rider' as const, profile: riderProfile }] : []),
+                                    ...(hasValidCoordinates(activeRide.destination) ? [{ id: 'destination', position: { lat: activeRide.destination.lat, lng: activeRide.destination.lng }, label: activeRide.destination.address || 'Destination', type: 'destination' as const }] : []),
+                                    ...(activeRide.status === 'requested' ? nearbyDrivers.filter(d => d.currentLocation).map(driver => ({ id: driver.uid, position: driver.currentLocation!, label: driver.name, type: 'nearby' as const, profile: driver })) : [])
+                                  ]}
+                                  directionRequests={activeRideDirectionRequests}
+                                  center={focusedNearbyDriver?.currentLocation || riderProfile?.currentLocation || ridePickupLocation}
+                                  zoom={15}
+                                  height="100%"
+                                  freezeViewport={false}
+                                  showNearbyDrivers={activeRide.status === 'requested'}
+                                  showRouteControls={false}
+                                  onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                                  onMapClick={handleMapClick}
+                                  onToggleFavorite={handleToggleFavorite}
+                                  onRoutesGenerated={setAlternativeRoutes}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-slate-900 to-purple-950 flex items-center justify-center">
+                                  <div className="text-center">
+                                    <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3" />
+                                    <p className="text-white/50 font-medium">Loading map...</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 bg-gradient-to-t from-slate-950/90 via-slate-900/50 to-transparent z-0" />
+
+                            {/* UI Controls Overlay */}
+                            <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
+                              {/* Toggle Map View Mode (if applicable) */}
+                              {isCardMinimized && (
+                                <motion.button
+                                  initial={{ scale: 0, rotate: -180 }}
+                                  animate={{ scale: 1, rotate: 0 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => setIsCardMinimized(false)}
+                                  className="w-14 h-14 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl rounded-2xl flex items-center justify-center shadow-2xl border border-white/20 dark:border-zinc-700/50 text-purple-600 dark:text-purple-400"
+                                >
+                                  <div className="relative">
+                                    <Car className="w-7 h-7" />
+                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-zinc-900 animate-pulse" />
+                                  </div>
+                                </motion.button>
+                              )}
+                            </div>
+
+                            {/* Overlay Card - MULTI-STATE */}
+                            <AnimatePresence mode="wait">
+                              {isCardMinimized ? null : !isCardExpanded ? (
+                                <motion.div
+                                  key="preview-card"
+                                  initial={{ y: 100, opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: 100, opacity: 0 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                  className="absolute bottom-4 sm:bottom-6 left-3 sm:left-4 right-3 sm:right-4 md:left-auto md:right-8 md:bottom-8 md:w-[420px] rounded-[2.5rem] border border-white/20 bg-white/95 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] backdrop-blur-2xl dark:border-zinc-700/50 dark:bg-zinc-900/95 z-10 overflow-hidden"
+                                >
+                                  <div className="p-1">
+                                    <div className="flex items-center gap-2 p-3 pb-1">
+                                      <button 
+                                        onClick={() => setIsCardMinimized(true)}
+                                        className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-xl text-gray-400 transition-colors"
+                                      >
+                                        <ChevronRight className="w-5 h-5 transform rotate-90" />
+                                      </button>
+                                      <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <motion.div 
+                                          className="h-full bg-purple-600"
+                                          initial={{ width: "0%" }}
+                                          animate={{ width: activeRide.status === 'requested' ? '25%' : activeRide.status === 'accepted' ? '50%' : activeRide.status === 'arrived' ? '75%' : '100%' }}
+                                        />
+                                      </div>
+                                    </div>
+                                    
+                                    <button onClick={() => setIsCardExpanded(true)} className="w-full p-4 pt-2 text-left">
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0 flex-1">
+                                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                                            <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${activeRide.status === 'requested' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20' : activeRide.status === 'accepted' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20'}`}>
+                                              <span className={`h-2 w-2 rounded-full ${activeRide.status === 'requested' || activeRide.status === 'accepted' ? 'bg-current animate-pulse' : 'bg-current'}`} />
+                                              {activeRide.status === 'requested' ? 'Finding Rider' : activeRide.status === 'accepted' ? 'Rider On Way' : activeRide.status === 'arrived' ? 'Rider Arrived' : 'Trip Ongoing'}
+                                            </div>
+                                            {eta !== null && activeRide.status === 'accepted' && (
+                                              <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                                                <Timer className="w-3.5 h-3.5" />
+                                                {eta} min
+                                              </div>
+                                            )}
+                                          </div>
+                                          {riderProfile ? (
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-12 h-12 rounded-2xl bg-gray-200 overflow-hidden ring-4 ring-white dark:ring-zinc-800 shadow-lg">
+                                                {riderProfile.avatarUrl ? <img src={riderProfile.avatarUrl} className="w-full h-full object-cover" alt="" /> : <UserIcon className="w-full h-full p-2 text-gray-400" />}
+                                              </div>
+                                              <div className="min-w-0">
+                                                <p className="font-black text-gray-900 dark:text-white truncate">{riderProfile.name}</p>
+                                                <p className="text-xs text-gray-500 font-bold truncate tracking-tight">{riderProfile.vehicleModel || 'Vehicle'} • {riderProfile.numberPlate || 'Plate'}</p>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center text-purple-600">
+                                                <MapPin className="w-5 h-5" />
+                                              </div>
+                                              <p className="text-sm font-bold text-gray-700 dark:text-zinc-300 truncate">{activeRide.pickup.address}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-zinc-800 flex items-center justify-center text-gray-400 group-hover:text-purple-600 transition-colors shadow-inner">
+                                          <ChevronRight className="w-6 h-6 transform -rotate-90 md:rotate-0" />
+                                        </div>
+                                      </div>
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ) : (
+                                <motion.div
+                                  key="full-card"
+                                  initial={{ y: "100%", opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: "100%", opacity: 0 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                  className="absolute bottom-0 left-0 right-0 md:left-auto md:right-4 md:top-4 md:bottom-4 md:w-[480px] md:max-h-none overflow-y-auto rounded-t-[3rem] md:rounded-[3rem] border border-white/20 bg-white/95 shadow-2xl backdrop-blur-3xl dark:bg-zinc-900/95 z-20 custom-scrollbar"
+                                >
+                                  <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md pt-5 pb-3 px-8 flex flex-col items-center border-b border-gray-100 dark:border-zinc-800">
+                                    <div className="h-1.5 w-16 rounded-full bg-gray-300 dark:bg-zinc-700 mb-5" />
+                                    <div className="w-full flex items-center justify-between">
+                                      <div>
+                                        <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Travel Details</h3>
+                                        <p className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-[0.2em] mt-1">Ride ID: {activeRide.id.slice(-6)}</p>
+                                      </div>
+                                      <button 
+                                        onClick={() => setIsCardExpanded(false)} 
+                                        className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-zinc-700 transition-all"
+                                      >
+                                        <X className="w-6 h-6" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="p-8 space-y-8">
+                                    {/* Status Section */}
+                                    <div className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-purple-500/30">
+                                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl" />
+                                      <div className="relative z-10 flex flex-col gap-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                            {activeRide.status}
+                                          </div>
+                                          {activeRide.fare > 0 && (
+                                            <div className="text-2xl font-black">{formatRwf(activeRide.fare)}</div>
+                                          )}
+                                        </div>
+                                        <h2 className="text-3xl font-black leading-tight">
+                                          {activeRide.status === 'requested' ? 'Finding your Rider' : activeRide.status === 'accepted' ? 'Rider is on the way' : activeRide.status === 'arrived' ? 'Rider has arrived' : 'Trip is ongoing'}
+                                        </h2>
+                                        {eta !== null && activeRide.status === 'accepted' && (
+                                          <div className="flex items-center gap-2 bg-white/10 w-fit px-4 py-2 rounded-xl backdrop-blur-md">
+                                            <Timer className="w-5 h-5" />
+                                            <span className="font-bold">{eta} min estimated arrival</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Rider Profile Card */}
+                                    {riderProfile && (
+                                      <div className="flex items-center justify-between p-6 bg-gray-50 dark:bg-zinc-800/50 rounded-[2.5rem] border border-gray-100 dark:border-zinc-700 shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                          {riderProfile.avatarUrl ? (
+                                            <img src={riderProfile.avatarUrl} className="w-16 h-16 rounded-[1.25rem] object-cover shadow-lg ring-4 ring-white dark:ring-zinc-800" alt="" />
+                                          ) : (
+                                            <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-600 rounded-[1.25rem] flex items-center justify-center text-white shadow-lg">
+                                              <UserIcon className="w-8 h-8" />
+                                            </div>
+                                          )}
+                                          <div>
+                                            <p className="font-black text-lg text-gray-900 dark:text-white leading-tight">{riderProfile.name}</p>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                              <Star className="w-4 h-4 text-amber-400 fill-current" />
+                                              <span className="text-sm font-black text-gray-600 dark:text-zinc-400">{riderProfile.rating}</span>
+                                              <span className="w-1 h-1 bg-gray-300 rounded-full mx-1" />
+                                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{riderProfile.vehicleModel || 'Motorbike'}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <motion.a whileTap={{ scale: 0.9 }} href={`tel:${riderProfile.phoneNumber}`} className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20"><Phone className="w-5 h-5" /></motion.a>
+                                          <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleToggleFavorite(riderProfile.uid)} className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-md transition-all ${profile.favoriteUserIds?.includes(riderProfile.uid) ? 'bg-red-500 text-white' : 'bg-white dark:bg-zinc-700 text-gray-400'}`}><Heart className={`w-5 h-5 ${profile.favoriteUserIds?.includes(riderProfile.uid) ? 'fill-current' : ''}`} /></motion.button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Points and Distance */}
+                                    <div className="space-y-6">
+                                      <div className="relative pl-10 space-y-8">
+                                        <div className="absolute left-[1.125rem] top-2 bottom-2 w-0.5 bg-dashed border-l-2 border-dashed border-gray-200 dark:border-zinc-800" />
+                                        
+                                        <div className="relative">
+                                          <div className="absolute -left-[1.875rem] top-0 w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white">
+                                            <MapPin className="w-4 h-4" />
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] mb-1">Pickup Point</p>
+                                            <p className="text-base font-bold text-gray-900 dark:text-white leading-relaxed">{activeRide.pickup.address}</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="relative">
+                                          <div className="absolute -left-[1.875rem] top-0 w-8 h-8 rounded-xl bg-red-500 flex items-center justify-center shadow-lg shadow-red-500/20 text-white">
+                                            <Navigation className="w-4 h-4" />
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-black text-red-600 dark:text-red-400 uppercase tracking-[0.2em] mb-1">Destination</p>
+                                            <p className="text-base font-bold text-gray-900 dark:text-white leading-relaxed">{activeRide.destination.address}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {activeRide.routeDistanceMeters && (
+                                        <div className="flex items-center gap-4 p-5 bg-gray-50 dark:bg-zinc-800/50 rounded-2xl border border-gray-100 dark:border-zinc-700">
+                                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-700 flex items-center justify-center text-purple-600 shadow-sm">
+                                            <Route className="w-5 h-5" />
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Estimated Distance</p>
+                                            <p className="text-lg font-black text-gray-900 dark:text-white">{formatDistanceKm(activeRide.routeDistanceMeters)}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="space-y-4 pt-4">
+                                      {activeRide.status === 'arrived' && !activeRide.passengerConfirmedArrival && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmArrival} className="bg-emerald-500 text-white py-5 rounded-2xl font-black shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2">
+                                            <CheckCircle2 className="w-6 h-6" /> I'm Here
+                                          </motion.button>
+                                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleRejectArrival} className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-5 rounded-2xl font-black border-2 border-red-100 dark:border-red-500/20">Rider Away</motion.button>
+                                        </div>
+                                      )}
+
+                                      {activeRide.status === 'ongoing' && activeRide.riderConfirmedEnd && (
+                                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleConfirmReached} className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3">
+                                          <Award className="w-6 h-6" /> Confirm Trip Completion
+                                        </motion.button>
+                                      )}
+
+                                      {['requested', 'accepted', 'arrived'].includes(activeRide.status) && (
+                                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowCancelModal(true)} className="w-full bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 py-5 rounded-2xl font-black border-2 border-red-100 dark:border-red-500/20 hover:bg-red-100 transition-all">Cancel Trip</motion.button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                          
+                          {/* Cancel Modal */}
+                          <AnimatePresence>
+                            {showCancelModal && (
+                              <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCancelModal(false)} />
+                                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white dark:bg-zinc-950 w-full max-w-sm rounded-[2.5rem] p-8 relative z-10 shadow-2xl">
+                                  <h3 className="text-2xl font-black mb-2">Cancel Ride?</h3>
+                                  <p className="text-gray-500 mb-6">Are you sure you want to cancel this trip?</p>
+                                  <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason for cancellation..." className="w-full bg-gray-50 dark:bg-zinc-800 rounded-xl p-4 mb-6 outline-none" rows={3} />
+                                  <div className="flex gap-4">
+                                    <button onClick={() => setShowCancelModal(false)} className="flex-1 font-bold text-gray-400">Keep</button>
+                                    <button onClick={handleCancelRide} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-bold shadow-lg">Cancel</button>
+                                  </div>
+                                </motion.div>
+                              </div>
+                            )}
+                          </AnimatePresence>
+                        </>
+                      ) : (
+                        // INTEGRATED LAYOUT: Map-First Approach
+                        <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
                         <div className="flex flex-col gap-6 p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
                           {/* 1. Header (Adaptive) */}
                           <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[2.5rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl shadow-purple-500/20">
@@ -1545,8 +1383,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
                         </AnimatePresence>
                         </div>
                       </div>
-                    </motion.div>
-                  )}
+                    )}
+                  </motion.div>
+                )}
                   {viewMode === 'reports' && (
                     <motion.div
                       key="reports-view"

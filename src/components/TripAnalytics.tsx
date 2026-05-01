@@ -35,6 +35,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
   const [companions, setCompanions] = useState<CompanionStats[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<'trips' | 'fare' | 'rating'>('trips');
 
   useEffect(() => {
@@ -43,59 +44,57 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
 
   const loadAnalytics = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const completedRides: Ride[] = [];
       const now = new Date();
+      // Calculate start date (12 months ago)
+      const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      
+      // Perform ONE query for the entire 12-month range
+      const q = userRole === 'passenger'
+        ? query(
+            collection(db, 'rides'),
+            where('passengerId', '==', user.uid),
+            where('status', '==', 'completed'),
+            where('completedAt', '>=', startDate),
+            orderBy('completedAt', 'desc')
+          )
+        : query(
+            collection(db, 'rides'),
+            where('riderId', '==', user.uid),
+            where('status', '==', 'completed'),
+            where('completedAt', '>=', startDate),
+            orderBy('completedAt', 'desc')
+          );
 
-      for (let i = 0; i < 12; i++) {
-        const month = (now.getMonth() - i + 12) % 12;
-        const year = now.getFullYear() - Math.floor((now.getMonth() - i + 12) / 12);
-        const startDate = new Date(year, month, 1);
-        const endDate = new Date(year, month + 1, 0, 23, 59, 59);
-
-        const q = userRole === 'passenger'
-          ? query(
-              collection(db, 'rides'),
-              where('passengerId', '==', user.uid),
-              where('status', '==', 'completed'),
-              where('completedAt', '>=', startDate),
-              where('completedAt', '<=', endDate),
-              orderBy('completedAt', 'desc')
-            )
-          : query(
-              collection(db, 'rides'),
-              where('riderId', '==', user.uid),
-              where('status', '==', 'completed'),
-              where('completedAt', '>=', startDate),
-              where('completedAt', '<=', endDate),
-              orderBy('completedAt', 'desc')
-            );
-
-        const snapshot = await getDocs(q);
-        const monthRides = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ride));
-        completedRides.push(...monthRides);
-      }
+      const snapshot = await getDocs(q);
+      const completedRides = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ride));
 
       const stats: { [key: string]: MonthlyStats } = {};
       const companionMap: { [key: string]: { trips: number; totalFare: number; profile: UserProfile | null } } = {};
+
+      // Initialize stats for the last 12 months with zeros
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+        stats[monthKey] = {
+          month: d.getMonth(),
+          year: d.getFullYear(),
+          trips: 0,
+          totalFare: 0,
+          averageRating: 0
+        };
+      }
 
       for (const ride of completedRides) {
         const date = ride.completedAt?.toDate ? ride.completedAt.toDate() : new Date(ride.completedAt);
         const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
 
-        if (!stats[monthKey]) {
-          stats[monthKey] = {
-            month: date.getMonth(),
-            year: date.getFullYear(),
-            trips: 0,
-            totalFare: 0,
-            averageRating: 0
-          };
+        if (stats[monthKey]) {
+          stats[monthKey].trips++;
+          stats[monthKey].totalFare += ride.fare || 0;
+          stats[monthKey].averageRating += ride.riderRating || 0;
         }
-
-        stats[monthKey].trips++;
-        stats[monthKey].totalFare += ride.fare || 0;
-        stats[monthKey].averageRating += ride.riderRating || 0;
 
         const companionId = userRole === 'passenger' ? ride.riderId : ride.passengerId;
         if (companionId) {
@@ -120,27 +119,40 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
 
       setMonthlyStats(monthlyArray);
 
+      // Load companion profiles (top 5)
+      const topCompanionIds = Object.entries(companionMap)
+        .sort(([, a], [, b]) => b.trips - a.trips)
+        .slice(0, 5)
+        .map(([id]) => id);
+
       const companionStats: CompanionStats[] = [];
-      for (const [userId, data] of Object.entries(companionMap)) {
+      for (const userId of topCompanionIds) {
         try {
           const userDoc = await getDoc(doc(db, 'users', userId));
-          const profile = userDoc.data() as UserProfile;
-          companionStats.push({
-            userId,
-            name: profile.name,
-            avatar: profile.avatarUrl,
-            trips: data.trips,
-            totalFare: data.totalFare
-          });
+          if (userDoc.exists()) {
+            const profile = userDoc.data() as UserProfile;
+            const data = companionMap[userId];
+            companionStats.push({
+              userId,
+              name: profile.name,
+              avatar: profile.avatarUrl,
+              trips: data.trips,
+              totalFare: data.totalFare
+            });
+          }
         } catch (e) {
           console.error('Error loading companion profile:', e);
         }
       }
 
-      companionStats.sort((a, b) => b.trips - a.trips);
-      setCompanions(companionStats.slice(0, 5));
-    } catch (error) {
-      console.error('Error loading analytics:', error);
+      setCompanions(companionStats);
+    } catch (err: any) {
+      console.error('Error loading analytics:', err);
+      let msg = err.message || 'Failed to load analytics.';
+      if (msg.toLowerCase().includes('index')) {
+        msg = 'Database index is being created. Please wait a few minutes.';
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -162,13 +174,13 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
   const avgMonthlyFare = monthlyStats.length > 0 
     ? monthlyStats.reduce((sum, s) => sum + s.totalFare, 0) / monthlyStats.length 
     : 0;
-  const overallRating = monthlyStats.length > 0
-    ? monthlyStats.reduce((sum, s) => sum + s.averageRating, 0) / monthlyStats.length
+  const overallRating = monthlyStats.filter(s => s.trips > 0).length > 0
+    ? monthlyStats.filter(s => s.trips > 0).reduce((sum, s) => sum + s.averageRating, 0) / monthlyStats.filter(s => s.trips > 0).length
     : 0;
 
   const metrics = [
     { key: 'trips' as const, label: 'Trips', icon: Route, color: 'from-violet-400 to-purple-600' },
-    { key: 'fare' as const, label: 'Earnings', icon: DollarSign, color: 'from-emerald-400 to-green-600' },
+    { key: 'fare' as const, label: 'Spending', icon: DollarSign, color: 'from-emerald-400 to-green-600' },
     { key: 'rating' as const, label: 'Rating', icon: Star, color: 'from-amber-400 to-orange-600' },
   ];
 
@@ -193,6 +205,26 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
         </div>
       </motion.div>
 
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 dark:bg-red-500/10 p-6 rounded-[2rem] border border-red-100 dark:border-red-500/20 flex items-center gap-4 text-red-600 dark:text-red-400"
+        >
+          <AlertCircle className="w-6 h-6 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold">Analytics unavailable</p>
+            <p className="text-sm opacity-90">{error}</p>
+          </div>
+          <button 
+            onClick={loadAnalytics}
+            className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-red-700 transition-all"
+          >
+            Retry
+          </button>
+        </motion.div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <motion.div
@@ -202,7 +234,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
             <Loader2 className="w-10 h-10 text-purple-600" />
           </motion.div>
         </div>
-      ) : monthlyStats.length === 0 ? (
+      ) : monthlyStats.length === 0 && !error ? (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -218,7 +250,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
             Complete your first ride to see analytics
           </p>
         </motion.div>
-      ) : (
+      ) : !error && (
         <>
           {/* Metric Selector */}
           <div className="flex gap-2 p-1.5 bg-gray-100 dark:bg-zinc-800 rounded-2xl">
