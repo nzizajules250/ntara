@@ -3,7 +3,7 @@
  * Handles Directions API, Places API, and route calculations
  */
 
-const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyA0x1maORlZEkKWdFgxDBuDukI4mOMDlb0';
+const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDD3klnDaCOHb2HoUFSPeiumFZxMneuA10';
 const GOOGLE_ROUTES_API_KEY = (import.meta as any).env.VITE_GOOGLE_ROUTES_API_KEY || 'AIzaSyCVcKfiko_Ne7lcgIN7Zpu8FXytk_KBFVg';
 
 export interface RouteDetails {

@@ -1,5 +1,5 @@
 {
-  "name": "SwiftRide",
+  "name": "Ntwara",
   "description": "A real-time ride-sharing platform for efficient and smooth transportation connection between passengers and riders.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": []

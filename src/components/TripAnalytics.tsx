@@ -178,7 +178,7 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[3rem] p-8 shadow-2xl shadow-purple-500/20"
+        className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-8 shadow-2xl shadow-purple-500/20"
       >
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />

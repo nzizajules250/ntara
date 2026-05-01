@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { UserProfile, createRideRequest, subscribeToUserRides, Ride, updateRideStatus, subscribeToUserProfile, rateRide, RatingReason, reverseGeocode, db, subscribeToOnlineRiders, saveLocation, removeSavedLocation, getNearbyDrivers, SavedLocation } from '../lib/firebase';
-import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike, BarChart3, FileText, Zap, Send, Search } from 'lucide-react';
+import { MapPin, Navigation, Clock, ChevronRight, X, Loader2, CheckCircle2, Navigation2, Star, User as UserIcon, Map as MapIcon, ShieldCheck, Award, Timer, Compass, Heart, Phone, Save, Trash2, MapPinPlus, Car, Bike, BarChart3, FileText, Zap, Send, Search, Route, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotifications } from './NotificationCenter';
 import { useLanguage } from '../lib/i18n';
 import { updateDoc, doc, arrayUnion, arrayRemove, serverTimestamp, getDoc } from 'firebase/firestore';
 import { calculateRideFare, formatDistanceKm, formatRwf } from '../lib/fareUtils';
-import { geocodeAddressLocation, getDistanceBetween, getRouteDetails } from '../lib/mapUtils';
+import { geocodeAddressLocation, getDistanceBetween, getRouteDetails, PlaceDetails } from '../lib/mapUtils';
 import MapComponent from './MapComponent';
 import TripReport from './TripReport';
 import TripAnalytics from './TripAnalytics';
+import AutocompleteInput from './AutocompleteInput';
 
 interface Props {
   user: FirebaseUser;
@@ -76,6 +77,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
   const [isCalculatingEstimate, setIsCalculatingEstimate] = useState(false);
   const [isResolvingPickupLocation, setIsResolvingPickupLocation] = useState(false);
   const [isResolvingDestinationLocation, setIsResolvingDestinationLocation] = useState(false);
+  const [alternativeRoutes, setAlternativeRoutes] = useState<any[]>([]);
+  const [previewLocation, setPreviewLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [locationToSave, setLocationToSave] = useState<{ address: string, lat: number, lng: number } | null>(null);
 
   const hasNotificationBeenSent = (rideId: string, eventType: string): boolean => {
     if (!notificationSentRef.current[rideId]) notificationSentRef.current[rideId] = new Set();
@@ -403,6 +407,19 @@ export default function PassengerDashboard({ user, profile }: Props) {
     };
   }, [passengerLocation, destinationLocation, activeRide]);
 
+  // Auto-calculate route estimate when locations change
+  useEffect(() => {
+    if (hasValidCoordinates(passengerLocation) && hasValidCoordinates(destinationLocation)) {
+      setIsCalculatingEstimate(true);
+      calculateRouteEstimate(passengerLocation!, destinationLocation!)
+        .then(setRideEstimate)
+        .catch(console.error)
+        .finally(() => setIsCalculatingEstimate(false));
+    } else {
+      setRideEstimate(null);
+    }
+  }, [passengerLocation?.lat, passengerLocation?.lng, destinationLocation?.lat, destinationLocation?.lng]);
+
   // Send SMS to emergency contact when ride starts
   const sendEmergencyContactSMS = async (ride: Ride) => {
     if (!profile.emergencyContact) return;
@@ -448,7 +465,8 @@ export default function PassengerDashboard({ user, profile }: Props) {
         catch (error) { console.error('Failed to load nearby drivers:', error); }
       };
       loadNearbyDrivers();
-      const interval = setInterval(loadNearbyDrivers, 5000);
+      // Poll every 15s instead of 5s to reduce Firestore reads by ~66%
+      const interval = setInterval(loadNearbyDrivers, 15000);
       return () => clearInterval(interval);
     } else { setNearbyDrivers([]); }
   }, [activeRide, passengerLocation]);
@@ -484,7 +502,11 @@ export default function PassengerDashboard({ user, profile }: Props) {
       setActiveRide(active || null); setCompletedRide(justCompleted || null);
     });
     return unsubscribe;
-  }, [user.uid, addNotification, profile, sendEmergencyContactSMS]);
+    // NOTE: addNotification and profile are stable refs from context/props,
+    // sendEmergencyContactSMS is intentionally excluded to prevent
+    // subscription churn (it captures profile via closure already).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.uid]);
 
   useEffect(() => {
     const ridePickupLocation = passengerLocation || (activeRide && hasValidCoordinates(activeRide.pickup) ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng } : null);
@@ -508,7 +530,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
     ...(passengerLocation ? [{ id: 'picker-pickup', position: passengerLocation, label: pickup || t('pickupLocation'), type: 'passenger' as const }] : []),
     ...(destinationLocation ? [{ id: 'picker-destination', position: destinationLocation, label: destination || t('destinationAddress'), type: 'destination' as const }] : [])
   ];
-  const pickerDirectionRequests = passengerLocation && destinationLocation ? [{ id: 'picker-route-preview', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6' }] : [];
+  const pickerDirectionRequests = passengerLocation && destinationLocation ? [{ id: 'picker-route-preview', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6', provideRouteAlternatives: true }] : [];
   const estimatedDurationLabel = rideEstimate ? formatDurationMinutes(rideEstimate.durationSeconds) : null;
   const estimatedTripMeta = rideEstimate
     ? [formatDistanceKm(rideEstimate.distanceMeters), estimatedDurationLabel].filter(Boolean).join(' • ')
@@ -615,16 +637,16 @@ export default function PassengerDashboard({ user, profile }: Props) {
     const waitingForRiderEndSignal = activeRide.status === 'ongoing' && !activeRide.riderConfirmedEnd;
     const rideDestination = hasValidCoordinates(activeRide.destination) ? { lat: activeRide.destination.lat, lng: activeRide.destination.lng } : null;
     const activeRideDirectionRequests = [
-      ...(activeRide.status === 'requested' && ridePickupLocation && rideDestination ? [{ id: `passenger-requested-trip-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6' }] : []),
-      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && riderProfile?.currentLocation && ridePickupLocation ? [{ id: `passenger-driver-to-pickup-${activeRide.id}`, origin: riderProfile.currentLocation, destination: ridePickupLocation, color: '#10b981' }] : []),
-      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && ridePickupLocation && rideDestination ? [{ id: `passenger-pickup-to-destination-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6' }] : []),
-      ...(activeRide.status === 'ongoing' && riderProfile?.currentLocation && rideDestination ? [{ id: `passenger-live-trip-${activeRide.id}`, origin: riderProfile.currentLocation, destination: rideDestination, color: '#8b5cf6' }] : [])
+      ...(activeRide.status === 'requested' && ridePickupLocation && rideDestination ? [{ id: `passenger-requested-trip-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && riderProfile?.currentLocation && ridePickupLocation ? [{ id: `passenger-driver-to-pickup-${activeRide.id}`, origin: riderProfile.currentLocation, destination: ridePickupLocation, color: '#10b981', provideRouteAlternatives: true }] : []),
+      ...((activeRide.status === 'accepted' || activeRide.status === 'arrived') && ridePickupLocation && rideDestination ? [{ id: `passenger-pickup-to-destination-${activeRide.id}`, origin: ridePickupLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : []),
+      ...(activeRide.status === 'ongoing' && riderProfile?.currentLocation && rideDestination ? [{ id: `passenger-live-trip-${activeRide.id}`, origin: riderProfile.currentLocation, destination: rideDestination, color: '#8b5cf6', provideRouteAlternatives: true }] : [])
     ];
 
     return (
       <>
         {/* MOBILE: Full-Screen Map with Overlay */}
-        <div className="md:hidden relative -mx-3 -mt-3 min-h-[calc(100vh-4.75rem)] overflow-hidden bg-gradient-to-b from-slate-900 to-purple-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem]">
+        <div className="md:hidden relative -mx-2 sm:-mx-3 -mt-2 sm:-mt-3 min-h-[calc(100vh-5rem)] overflow-hidden bg-gradient-to-b from-slate-900 to-purple-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem]">
           {/* Full-Screen Map Background */}
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             {ridePickupLocation ? (
@@ -643,6 +665,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                 showNearbyDrivers={activeRide.status === 'requested'}
                 showRouteControls={false}
                 onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                onRoutesGenerated={setAlternativeRoutes}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-slate-900 to-purple-950 flex items-center justify-center">
@@ -660,14 +683,14 @@ export default function PassengerDashboard({ user, profile }: Props) {
             <AnimatePresence>
               {!isCardExpanded ? (
                 // COLLAPSED STATE - Minimal bar
-                <motion.div
-                  key="collapsed"
-                  initial={{ y: 100, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 100, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="absolute bottom-6 left-4 right-4 rounded-3xl border border-white/20 bg-white/95 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] backdrop-blur-2xl dark:border-zinc-700/50 dark:bg-zinc-900/95 z-10"
-                >
+                  <motion.div
+                    key="collapsed"
+                    initial={{ y: 100, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 100, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="absolute bottom-4 sm:bottom-6 left-3 sm:left-4 right-3 sm:right-4 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/95 shadow-[0_-8px_30px_-15px_rgba(0,0,0,0.5)] backdrop-blur-2xl dark:border-zinc-700/50 dark:bg-zinc-900/95 z-10"
+                  >
                   <button
                     onClick={() => setIsCardExpanded(true)}
                     className="w-full p-4 sm:p-5"
@@ -743,6 +766,42 @@ export default function PassengerDashboard({ user, profile }: Props) {
                           </div>
                         )}
                       </div>
+
+                      {/* DESKTOP: Persistent Map Side */}
+                      <div className="hidden md:block md:col-span-7 relative h-full min-h-[600px] rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 dark:border-zinc-700/50">
+                        <MapComponent
+                          center={previewLocation || destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
+                          zoom={previewLocation ? 17 : 15}
+                          markers={[
+                            ...(previewLocation ? [{ id: 'preview', position: previewLocation, label: 'Preview', type: 'place' as const }] : []),
+                            ...(passengerLocation ? [{ id: 'passenger', position: passengerLocation, label: 'You', type: 'passenger' as const }] : []),
+                            ...(destinationLocation ? [{ id: 'destination', position: destinationLocation, label: 'Destination', type: 'destination' as const }] : []),
+                            ...onlineRiders.filter(r => hasValidCoordinates(r.currentLocation)).map(rider => ({ id: rider.uid, position: rider.currentLocation!, label: rider.name, type: 'nearby' as const, profile: rider }))
+                          ]}
+                          directionRequests={passengerLocation && destinationLocation ? [{ id: 'route', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6', provideRouteAlternatives: true }] : []}
+                          height="100%"
+                          freezeViewport={false}
+                          showNearbyDrivers={true}
+                          onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                          onRoutesGenerated={setAlternativeRoutes}
+                        />
+
+                        {/* Floating Status Indicator */}
+                        {onlineRiders.length > 0 && (
+                          <div className="absolute top-6 left-6 z-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl px-4 py-2 rounded-2xl shadow-xl border border-white/20 dark:border-zinc-700/50 flex items-center gap-3">
+                            <div className="flex -space-x-2">
+                              {onlineRiders.slice(0, 3).map(rider => (
+                                <div key={rider.uid} className="w-8 h-8 rounded-full border-2 border-white dark:border-zinc-800 bg-gray-200 overflow-hidden">
+                                  {rider.photoURL ? <img src={rider.photoURL} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-gray-400">R</div>}
+                                </div>
+                              ))}
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                              {onlineRiders.length} {t('online') || 'Active Drivers'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                       <div className="shrink-0 rounded-full bg-gray-50 p-2 dark:bg-zinc-800 shadow-inner">
                         <ChevronRight className="h-6 w-6 text-gray-400 dark:text-zinc-400 transform -rotate-90 transition-transform" />
                       </div>
@@ -751,14 +810,14 @@ export default function PassengerDashboard({ user, profile }: Props) {
                 </motion.div>
               ) : (
                 // EXPANDED STATE - Full details
-                <motion.div
-                  key="expanded"
-                  initial={{ y: "100%", opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: "100%", opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-[2.5rem] border-t border-white/20 bg-white/95 shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.5)] backdrop-blur-3xl dark:border-zinc-700/50 dark:bg-zinc-900/95 pb-6 z-10"
-                >
+                  <motion.div
+                    key="expanded"
+                    initial={{ y: "100%", opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: "100%", opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    className="absolute bottom-0 left-0 right-0 max-h-[90vh] overflow-y-auto rounded-t-[2rem] sm:rounded-t-[2.5rem] border-t border-white/20 bg-white/95 shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.5)] backdrop-blur-3xl dark:border-zinc-700/50 dark:bg-zinc-900/95 pb-6 z-10"
+                  >
                   <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md pt-4 pb-2 px-6 flex flex-col items-center border-b border-gray-100 dark:border-zinc-800">
                     <div className="h-1.5 w-16 rounded-full bg-gray-300 dark:bg-zinc-600 mb-4" />
                     <div className="w-full flex items-center justify-between">
@@ -790,7 +849,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                           }`} />
                           <span className="text-[10px] font-black text-white uppercase tracking-widest">{activeRide.status}</span>
                         </div>
-                        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
                           {activeRide.status === 'requested' ? t('findingRider') || 'Finding Rider' : 
                            activeRide.status === 'accepted' ? t('riderOnWay') || 'Rider on Way' : 
                            activeRide.status === 'arrived' ? (activeRide.passengerConfirmedArrival ? t('arrivingSoon') || 'Arriving Soon' : t('riderArrivedNotify') || 'Rider Arrived') : 
@@ -827,6 +886,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                             height="400px"
                             showNearbyDrivers={activeRide.status === 'requested'}
                             onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                            onRoutesGenerated={setAlternativeRoutes}
                           />
                         </div>
                       )}
@@ -1031,25 +1091,25 @@ export default function PassengerDashboard({ user, profile }: Props) {
 
               // ==================== DEFAULT RIDE REQUEST VIEW ====================
               return (
-              <div className="flex flex-col gap-6 h-full bg-slate-50 dark:bg-slate-950 p-0 sm:p-4 md:p-6 transition-colors duration-500">
+              <div className="flex flex-col gap-4 md:gap-6 h-full bg-slate-50 dark:bg-slate-950 p-2 sm:p-4 md:p-6 transition-colors duration-500">
                 {/* Tab Navigation */}
-                <div className="flex gap-2 p-2 bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-2xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
+                <div className="flex gap-1.5 p-1.5 bg-white/60 dark:bg-white/10 backdrop-blur-3xl rounded-2xl border border-white/60 dark:border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-colors duration-500">
                   {[
-                    { key: 'ride' as const, label: 'Request', icon: MapIcon },
-                    { key: 'reports' as const, label: 'Reports', icon: FileText },
-                    { key: 'analytics' as const, label: 'Analytics', icon: BarChart3 }
+                    { key: 'ride' as const, label: t('rides') || 'Request', icon: MapIcon },
+                    { key: 'reports' as const, label: t('reports') || 'Reports', icon: FileText },
+                    { key: 'analytics' as const, label: t('analytics') || 'Analytics', icon: BarChart3 }
                   ].map((tab) => (
                     <motion.button
                       key={tab.key}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setViewMode(tab.key)}
-                      className={`flex-1 py-3.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-300 ${viewMode === tab.key
+                      className={`flex-1 py-3 sm:py-3.5 px-2 sm:px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 ${viewMode === tab.key
                         ? 'bg-white/80 dark:bg-white/20 text-slate-900 dark:text-white shadow-sm'
                         : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
                         }`}
                     >
-                      <tab.icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <tab.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-[9px] sm:text-sm font-black uppercase tracking-wider truncate">{tab.label}</span>
                     </motion.button>
                   ))}
                 </div>
@@ -1061,483 +1121,312 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="flex-1 flex flex-col md:gap-6 gap-0"
+                      className="flex-1 flex flex-col gap-6 overflow-hidden"
                     >
-                      {/* MOBILE: Full-Screen Map with Overlay Card */}
-                      <div className="md:hidden flex-1 flex flex-col relative min-h-[550px] h-[calc(100vh-12rem)]">
-                        {/* Full-Screen Map Background */}
-                        <div className="absolute inset-0 rounded-[2rem] overflow-hidden shadow-2xl">
-                          {passengerLocation || destinationLocation ? (
-                            <MapComponent
-                              center={destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
-                              zoom={15}
-                              markers={[
-                                ...(passengerLocation ? [{ id: 'passenger', position: passengerLocation, label: 'You', type: 'passenger' as const }] : []),
-                                ...(destinationLocation ? [{ id: 'destination', position: destinationLocation, label: 'Destination', type: 'destination' as const }] : []),
-                                ...onlineRiders.filter(r => hasValidCoordinates(r.currentLocation)).map(rider => ({ id: rider.uid, position: rider.currentLocation!, label: rider.name, type: 'nearby' as const, profile: rider }))
-                              ]}
-                              directionRequests={passengerLocation && destinationLocation ? [{ id: 'route', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6' }] : []}
-                              height="100%"
-                              freezeViewport={false}
-                              showNearbyDrivers={true}
-                              onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
-                              <div className="text-center">
-                                <div className="w-16 h-16 bg-purple-500/20 rounded-3xl flex items-center justify-center mx-auto mb-4">
-                                  <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                      {/* INTEGRATED LAYOUT: Map-First Approach */}
+                      <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+                        <div className="flex flex-col gap-6 p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full">
+                          {/* 1. Header (Adaptive) */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[2.5rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl shadow-purple-500/20">
+                            <div className="absolute inset-0 opacity-30">
+                              <div className="absolute top-0 right-0 w-72 h-72 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+                              <div className="absolute bottom-0 left-0 w-56 h-56 bg-white rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+                            </div>
+                            <div className="relative z-10">
+                              <h2 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">{t('whereTo')}</h2>
+                              <p className="text-white/70 font-semibold text-base md:text-lg">{t('requestRide')}</p>
+                            </div>
+                          </div>
+
+                          {/* 2. Interactive Map (Now at the top for clarity) */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between px-2">
+                              <p className="text-sm font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Route Preview</p>
+                              {onlineRiders.length > 0 && (
+                                <span className="flex items-center gap-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+                                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                  {onlineRiders.length} Online Drivers
+                                </span>
+                              )}
+                            </div>
+                            <div className="rounded-[2.5rem] md:rounded-[3rem] overflow-hidden shadow-2xl border border-white/20 dark:border-zinc-700/50 relative group h-[350px] md:h-[450px]">
+                              <MapComponent
+                                center={previewLocation || destinationLocation || passengerLocation || { lat: -1.9441, lng: 30.0619 }}
+                                zoom={previewLocation ? 17 : 15}
+                                markers={[
+                                  ...(previewLocation ? [{ id: 'preview', position: previewLocation, label: 'Preview', type: 'place' as const }] : []),
+                                  ...(passengerLocation ? [{ id: 'passenger', position: passengerLocation, label: 'You', type: 'passenger' as const }] : []),
+                                  ...(destinationLocation ? [{ id: 'destination', position: destinationLocation, label: 'Destination', type: 'destination' as const }] : []),
+                                  ...onlineRiders.filter(r => hasValidCoordinates(r.currentLocation)).map(rider => ({ id: rider.uid, position: rider.currentLocation!, label: rider.name, type: 'nearby' as const, profile: rider }))
+                                ]}
+                                directionRequests={passengerLocation && destinationLocation ? [{ id: 'route', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6', provideRouteAlternatives: true }] : []}
+                                height="100%"
+                                freezeViewport={false}
+                                showNearbyDrivers={true}
+                                onMarkerClick={(marker) => { if (marker.type === 'nearby') setSelectedNearbyRiderId(marker.id); }}
+                                onRoutesGenerated={setAlternativeRoutes}
+                              />
+                              {isPickingOnMap && (
+                                <div className="absolute top-4 left-4 right-16 z-10 bg-black/80 backdrop-blur-md rounded-2xl px-5 py-4 text-white shadow-2xl border border-white/10">
+                                  <p className="font-bold text-xs uppercase tracking-widest">Tap map to set {isPickingOnMap}</p>
+                                  {(isPickingOnMap === 'pickup' && pickup) && <p className="mt-1 text-sm text-emerald-300 font-semibold truncate">{pickup}</p>}
+                                  {(isPickingOnMap === 'destination' && destination) && <p className="mt-1 text-sm text-emerald-300 font-semibold truncate">{destination}</p>}
                                 </div>
-                                <p className="text-white/50 font-medium">Locating you...</p>
+                              )}
+                              {isPickingOnMap && (
+                                <button
+                                  onClick={() => setIsPickingOnMap(null)}
+                                  className="absolute top-4 right-4 bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-xl hover:bg-white transition-all z-10"
+                                >
+                                  <X className="w-5 h-5 text-gray-700" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* 3. Location Inputs */}
+                          <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[2.5rem] md:rounded-[3rem] p-5 md:p-6 shadow-xl border border-white/20 dark:border-zinc-700/50 space-y-4">
+                            <div className="relative group">
+                              <AutocompleteInput
+                                placeholder={t('pickupLocation')}
+                                value={pickup}
+                                onChange={(val) => { setPickup(val); if (!val) setPassengerLocation(null); }}
+                                onPlaceSelected={(details) => {
+                                  setPassengerLocation({ lat: details.lat, lng: details.lng });
+                                  setPickup(details.address);
+                                  setPreviewLocation(null);
+                                }}
+                                onPreview={(details) => setPreviewLocation(details ? { lat: details.lat, lng: details.lng } : null)}
+                                icon={<div className="w-3.5 h-3.5 rounded-full bg-green-500 ring-4 ring-green-100 dark:ring-green-500/20" />}
+                                className="w-full bg-gray-50 dark:bg-zinc-800 py-4 md:py-5 pl-14 pr-28 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg"
+                              />
+                              <div className="absolute right-2 top-[50%] -translate-y-1/2 flex gap-1 z-10">
+                                <button
+                                  onClick={handleUseCurrentLocation}
+                                  disabled={isLocating}
+                                  className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
+                                >
+                                  {isLocating ? <Loader2 className="w-5 h-5 animate-spin text-purple-500" /> : <Navigation2 className="w-5 h-5 text-gray-400" />}
+                                </button>
+                                <button
+                                  onClick={() => setIsPickingOnMap('pickup')}
+                                  className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
+                                >
+                                  <MapPinPlus className="w-5 h-5 text-gray-400" />
+                                </button>
+                                {pickup && passengerLocation && (
+                                  <button
+                                    onClick={() => {
+                                      setLocationToSave({ address: pickup, ...passengerLocation });
+                                      setLocationNameToSave('');
+                                      setShowSaveLocationModal(true);
+                                    }}
+                                    className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all text-purple-500"
+                                  >
+                                    <Save className="w-5 h-5" />
+                                  </button>
+                                )}
                               </div>
                             </div>
-                          )}
-                        </div>
-
-                        {/* Overlay Card - Request Form */}
-                        <motion.div
-                          initial={{ y: 100, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                          className="absolute bottom-4 left-4 right-4 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl rounded-[3rem] border border-white/20 dark:border-zinc-700/50 shadow-2xl max-h-[75vh] overflow-y-auto"
-                        >
-                          <div className="p-6 space-y-5">
-                            {/* Handle Bar */}
-                            <div className="flex justify-center mb-2">
-                              <div className="w-16 h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full" />
-                            </div>
-
-                            {/* Header */}
-                            <div>
-                              <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Where to?</h2>
-                              <p className="text-gray-500 dark:text-zinc-400 font-medium mt-2">{t('requestRide')}</p>
-                            </div>
-
-                            {/* Location Inputs */}
-                            <div className="space-y-4">
-                              <div className="relative group">
-                                <div className="absolute left-5 top-5 w-3.5 h-3.5 rounded-full bg-green-500 ring-4 ring-green-100 dark:ring-green-500/20 z-10 group-hover:scale-110 transition-transform" />
-                                <div className="absolute left-[1.65rem] top-9 bottom-0 w-0.5 bg-gradient-to-b from-green-500 to-red-500" />
-                                <input
-                                  type="text"
-                                  placeholder={t('pickupLocation')}
-                                  value={pickup}
-                                  onChange={(e) => { setPickup(e.target.value); setPassengerLocation(null); }}
-                                  className="w-full bg-gray-50 dark:bg-zinc-800 py-5 pl-14 pr-28 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg group-hover:shadow-xl"
-                                />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                                  <button
-                                    onClick={handleUseCurrentLocation}
-                                    disabled={isLocating}
-                                    className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all hover:scale-105"
-                                  >
-                                    {isLocating ? <Loader2 className="w-5 h-5 animate-spin text-purple-500" /> : <Navigation2 className="w-5 h-5 text-gray-400" />}
-                                  </button>
-                                  <button
-                                    onClick={() => setIsPickingOnMap('pickup')}
-                                    className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all hover:scale-105"
-                                  >
-                                    <Search className="w-5 h-5 text-gray-400" />
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="relative group">
-                                <div className="absolute left-5 top-5 w-3.5 h-3.5 rounded-full bg-red-500 ring-4 ring-red-100 dark:ring-red-500/20 z-10 group-hover:scale-110 transition-transform" />
-                                <input
-                                  type="text"
-                                  placeholder={t('destinationAddress')}
-                                  value={destination}
-                                  onChange={(e) => { setDestination(e.target.value); setDestinationLocation(null); }}
-                                  className="w-full bg-gray-50 dark:bg-zinc-800 py-5 pl-14 pr-14 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg group-hover:shadow-xl"
-                                />
+                            <div className="relative group">
+                              <AutocompleteInput
+                                placeholder={t('destinationAddress')}
+                                value={destination}
+                                onChange={(val) => { setDestination(val); if (!val) setDestinationLocation(null); }}
+                                onPlaceSelected={(details) => {
+                                  setDestinationLocation({ lat: details.lat, lng: details.lng });
+                                  setDestination(details.address);
+                                  setPreviewLocation(null);
+                                }}
+                                onPreview={(details) => setPreviewLocation(details ? { lat: details.lat, lng: details.lng } : null)}
+                                icon={<div className="w-3.5 h-3.5 rounded-full bg-red-500 ring-4 ring-red-100 dark:ring-red-100/20" />}
+                                className="w-full bg-gray-50 dark:bg-zinc-800 py-4 md:py-5 pl-14 pr-14 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg"
+                              />
+                              <div className="absolute right-2 top-[50%] -translate-y-1/2 flex gap-1 z-10">
                                 <button
                                   onClick={() => setIsPickingOnMap('destination')}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all hover:scale-105"
+                                  className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
                                 >
-                                  <Search className="w-5 h-5 text-gray-400" />
+                                  <MapPinPlus className="w-5 h-5 text-gray-400" />
                                 </button>
-                              </div>
-                            </div>
-
-                            {/* Vehicle Selection */}
-                            <div className="space-y-3">
-                              <p className="text-xs font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest">Choose Vehicle</p>
-                              <div className="grid grid-cols-2 gap-3">
-                                {[
-                                  { type: 'car' as const, icon: Car, label: 'Car', gradient: 'from-blue-500 to-cyan-500' },
-                                  { type: 'motorcycle' as const, icon: Bike, label: 'Moto', gradient: 'from-orange-500 to-red-500' }
-                                ].map((v) => (
-                                  <motion.button
-                                    key={v.type}
-                                    whileHover={{ scale: 1.02, y: -2 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={() => setVehicleType(v.type)}
-                                    className={`p-5 rounded-2xl font-bold flex flex-col items-center gap-3 transition-all duration-300 ${vehicleType === v.type
-                                      ? `bg-gradient-to-br ${v.gradient} text-white shadow-2xl shadow-current/30 scale-105`
-                                      : 'bg-gray-50 dark:bg-zinc-800 text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 shadow-lg'
-                                      }`}
+                                {destination && destinationLocation && (
+                                  <button
+                                    onClick={() => {
+                                      setLocationToSave({ address: destination, ...destinationLocation });
+                                      setLocationNameToSave('');
+                                      setShowSaveLocationModal(true);
+                                    }}
+                                    className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all text-purple-500"
                                   >
-                                    <v.icon className="w-7 h-7" />
-                                    <span className="text-sm">{v.label}</span>
-                                  </motion.button>
-                                ))}
+                                    <Save className="w-5 h-5" />
+                                  </button>
+                                )}
                               </div>
                             </div>
+                          </div>
 
-                            {/* Request Button */}
+                          {/* 4. Vehicle Selection */}
+                          <div className="space-y-4">
+                            <p className="text-sm font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest px-2">Choose Vehicle</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              {[
+                                { type: 'car' as const, icon: Car, label: 'Car', gradient: 'from-blue-500 to-cyan-500' },
+                                { type: 'motorcycle' as const, icon: Bike, label: 'Moto', gradient: 'from-orange-500 to-red-500' }
+                              ].map((v) => (
+                                <motion.button
+                                  key={v.type}
+                                  whileHover={{ scale: 1.02, y: -2 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setVehicleType(v.type)}
+                                  className={`p-6 rounded-2xl font-bold flex flex-col items-center gap-3 transition-all duration-300 ${vehicleType === v.type
+                                    ? `bg-gradient-to-br ${v.gradient} text-white shadow-2xl shadow-current/30 scale-105`
+                                    : 'bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 shadow-lg border border-white/20 dark:border-zinc-700/50'
+                                    }`}
+                                >
+                                  <v.icon className="w-8 h-8" />
+                                  <span className="text-base">{v.label}</span>
+                                </motion.button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 5. Fare Info and Request Action */}
+                          <div className="space-y-6">
+                            {pickup && destination && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-500/10 dark:to-indigo-500/10 p-6 md:p-8 rounded-[2.5rem] border border-purple-100 dark:border-purple-500/20 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-6"
+                              >
+                                <div className="space-y-1">
+                                  <p className="text-[10px] text-gray-500 dark:text-zinc-400 font-black uppercase tracking-[0.2em] mb-2">Estimated Fare</p>
+                                  {isPreparingRoute ? (
+                                    <div className="flex items-center gap-3 text-purple-600 dark:text-purple-400">
+                                      <Loader2 className="w-5 h-5 animate-spin" />
+                                      <p className="text-xl font-black">Calculating...</p>
+                                    </div>
+                                  ) : rideEstimate ? (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-4">
+                                        <p className="text-3xl md:text-4xl font-black text-purple-600 dark:text-purple-400 tracking-tight">{formatRwf(rideEstimate.fareRwf)}</p>
+                                        {alternativeRoutes.length > 1 && (
+                                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 text-[10px] font-black uppercase tracking-widest border border-purple-200 dark:border-purple-500/30">
+                                            <Route className="w-3.5 h-3.5" />
+                                            {alternativeRoutes.length} Routes
+                                          </div>
+                                        )}
+                                      </div>
+                                      {estimatedTripMeta && (
+                                        <p className="text-sm font-semibold text-gray-500 dark:text-zinc-400 flex items-center gap-2">
+                                          <Timer className="w-4 h-4" />
+                                          {estimatedTripMeta}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      Set locations to see fare
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="hidden md:flex w-16 h-16 bg-purple-600 text-white rounded-3xl items-center justify-center shadow-xl shadow-purple-500/30">
+                                  <Zap className="w-8 h-8" />
+                                </div>
+                              </motion.div>
+                            )}
+
                             <motion.button
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               onClick={handleRequestRide}
                               disabled={!pickup || !destination || isRequesting}
-                              className="w-full bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white py-6 rounded-2xl font-black text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-3 hover:shadow-purple-500/50 transition-all"
+                              className="w-full bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white py-6 md:py-8 rounded-[2rem] md:rounded-[2.5rem] font-black text-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-4 hover:shadow-purple-500/50 transition-all"
                             >
                               {isRequesting ? (
-                                <Loader2 className="w-6 h-6 animate-spin" />
+                                <Loader2 className="w-7 h-7 animate-spin" />
                               ) : (
                                 <>
-                                  <Zap className="w-6 h-6" />
+                                  <Zap className="w-7 h-7" />
                                   {t('requestNow')}
                                 </>
                               )}
                             </motion.button>
-
-                            {/* Fare Info */}
-                            {pickup && destination && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-500/10 dark:to-indigo-500/10 p-5 rounded-2xl border border-purple-100 dark:border-purple-500/20 shadow-lg"
-                              >
-                                <p className="text-sm text-gray-500 dark:text-zinc-400 font-bold uppercase tracking-wider mb-1">Estimated Fare</p>
-                                {isPreparingRoute ? (
-                                  <div className="flex items-center gap-3 text-purple-600 dark:text-purple-400">
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <p className="text-base font-black">Calculating route...</p>
-                                  </div>
-                                ) : rideEstimate ? (
-                                  <>
-                                    <p className="text-2xl font-black text-purple-600 dark:text-purple-400">{formatRwf(rideEstimate.fareRwf)}</p>
-                                    {estimatedTripMeta && (
-                                      <p className="mt-2 text-sm font-semibold text-gray-500 dark:text-zinc-400">{estimatedTripMeta}</p>
-                                    )}
-                                  </>
-                                ) : (
-                                  <p className="text-base font-bold text-amber-600 dark:text-amber-400">Set a clear pickup and destination to calculate the fare.</p>
-                                )}
-                              </motion.div>
-                            )}
                           </div>
-                        </motion.div>
-                      </div>
 
-                      {/* DESKTOP: Traditional Layout */}
-                      <div className="hidden md:flex flex-col gap-6">
-                        {/* Gradient Header */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 dark:from-violet-900 dark:via-purple-900 dark:to-indigo-950 rounded-[3rem] p-10 shadow-2xl shadow-purple-500/20">
-                          <div className="absolute inset-0 opacity-30">
-                            <div className="absolute top-0 right-0 w-72 h-72 bg-white rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-                            <div className="absolute bottom-0 left-0 w-56 h-56 bg-white rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
-                            <div className="absolute top-1/2 left-1/2 w-40 h-40 bg-purple-300 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl" />
-                          </div>
-                          <div className="relative z-10">
-                            <h2 className="text-4xl font-black text-white mb-3 tracking-tight">{t('whereTo')}</h2>
-                            <p className="text-white/70 font-semibold text-lg">{t('requestRide')}</p>
-                          </div>
-                        </div>
-
-                        {/* Input Cards */}
-                        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[3rem] p-6 shadow-xl border border-white/20 dark:border-zinc-700/50 space-y-4">
-                          <div className="relative group">
-                            <div className="absolute left-5 top-5 w-3.5 h-3.5 rounded-full bg-green-500 ring-4 ring-green-100 dark:ring-green-500/20 z-10 group-hover:scale-110 transition-transform" />
-                            <div className="absolute left-[1.65rem] top-9 bottom-0 w-0.5 bg-gradient-to-b from-green-500 to-red-500" />
-                            <input
-                              type="text"
-                              placeholder={t('pickupLocation')}
-                              value={pickup}
-                              onChange={(e) => { setPickup(e.target.value); setPassengerLocation(null); }}
-                              className="w-full bg-gray-50 dark:bg-zinc-800 py-5 pl-14 pr-28 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg"
-                            />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                              <button
-                                onClick={handleUseCurrentLocation}
-                                disabled={isLocating}
-                                className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
-                              >
-                                {isLocating ? <Loader2 className="w-5 h-5 animate-spin text-purple-500" /> : <Navigation2 className="w-5 h-5 text-gray-400" />}
-                              </button>
-                              <button
-                                onClick={() => setIsPickingOnMap('pickup')}
-                                className="p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
-                              >
-                                <Search className="w-5 h-5 text-gray-400" />
-                              </button>
-                            </div>
-                          </div>
-                          <div className="relative group">
-                            <div className="absolute left-5 top-5 w-3.5 h-3.5 rounded-full bg-red-500 ring-4 ring-red-100 dark:ring-red-500/20 z-10 group-hover:scale-110 transition-transform" />
-                            <input
-                              type="text"
-                              placeholder={t('destinationAddress')}
-                              value={destination}
-                              onChange={(e) => { setDestination(e.target.value); setDestinationLocation(null); }}
-                              className="w-full bg-gray-50 dark:bg-zinc-800 py-5 pl-14 pr-14 rounded-2xl border-2 border-transparent focus:border-purple-500 dark:focus:border-purple-400 transition-all outline-none font-semibold text-gray-900 dark:text-white placeholder:text-gray-400 shadow-lg"
-                            />
-                            <button
-                              onClick={() => setIsPickingOnMap('destination')}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-all"
-                            >
-                              <Search className="w-5 h-5 text-gray-400" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Vehicle Selection */}
-                        <div className="space-y-4">
-                          <p className="text-sm font-black text-gray-400 dark:text-zinc-500 uppercase tracking-widest px-2">Choose Vehicle</p>
-                          <div className="grid grid-cols-2 gap-4">
-                            {[
-                              { type: 'car' as const, icon: Car, label: 'Car', gradient: 'from-blue-500 to-cyan-500' },
-                              { type: 'motorcycle' as const, icon: Bike, label: 'Moto', gradient: 'from-orange-500 to-red-500' }
-                            ].map((v) => (
-                              <motion.button
-                                key={v.type}
-                                whileHover={{ scale: 1.02, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setVehicleType(v.type)}
-                                className={`p-6 rounded-2xl font-bold flex flex-col items-center gap-3 transition-all duration-300 ${vehicleType === v.type
-                                  ? `bg-gradient-to-br ${v.gradient} text-white shadow-2xl shadow-current/30 scale-105`
-                                  : 'bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 shadow-lg border border-white/20 dark:border-zinc-700/50'
-                                  }`}
-                              >
-                                <v.icon className="w-8 h-8" />
-                                <span className="text-base">{v.label}</span>
-                              </motion.button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Map Picker */}
-                        {isPickingOnMap && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            className="rounded-[3rem] overflow-hidden border-2 border-purple-500 dark:border-purple-400 shadow-2xl"
-                          >
-                            <div className="relative">
-                              <div className="absolute top-4 left-4 right-20 z-10 bg-black/80 backdrop-blur-md rounded-2xl px-5 py-4 text-white shadow-2xl border border-white/10">
-                                <p className="font-bold text-sm uppercase tracking-wider">Tap map to set {isPickingOnMap}</p>
-                                {(isPickingOnMap === 'pickup' && pickup) && <p className="mt-2 text-sm text-emerald-300 font-semibold truncate">{pickup}</p>}
-                                {(isPickingOnMap === 'destination' && destination) && <p className="mt-2 text-sm text-emerald-300 font-semibold truncate">{destination}</p>}
-                              </div>
-                              <MapComponent
-                                center={pickerCenter}
-                                zoom={15}
-                                markers={pickerMarkers}
-                                directionRequests={pickerDirectionRequests}
-                                onMapClick={handleMapClick}
-                                height="400px"
-                                showNearbyDrivers={false}
-                              />
-                              <button
-                                onClick={() => setIsPickingOnMap(null)}
-                                className="absolute top-4 right-4 bg-white/90 backdrop-blur-md p-3.5 rounded-2xl shadow-xl hover:bg-white transition-all z-10"
-                              >
-                                <X className="w-6 h-6 text-gray-700" />
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Available Riders Nearby */}
-                        {!activeRide && onlineRiders.length > 0 && (
-                          <div className="space-y-5">
-                            <div className="flex items-center justify-between px-4">
-                              <h3 className="text-sm font-black uppercase tracking-widest text-gray-400">{t('nearbyRiders')}</h3>
-                              <span className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/30">
-                                {onlineRiders.length} {t('online')}
-                              </span>
-                            </div>
-                            {(passengerLocation || onlineRiders.some((rider) => hasValidCoordinates(rider.currentLocation))) && (
-                              <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl p-4 rounded-[3rem] border border-white/20 dark:border-zinc-700/50 shadow-xl space-y-4">
-                                <div className="rounded-[2rem] overflow-hidden shadow-lg">
-                                  <MapComponent
-                                    markers={[
-                                      ...(passengerLocation ? [{ id: 'passenger-preview', position: passengerLocation, label: 'You', type: 'passenger' as const }] : []),
-                                      ...onlineRiders.filter((rider) => hasValidCoordinates(rider.currentLocation)).map((rider) => ({
-                                        id: rider.uid, position: rider.currentLocation!, label: rider.name,
-                                        type: selectedNearbyRiderId === rider.uid ? 'rider' as const : 'nearby' as const, profile: rider
-                                      }))
-                                    ]}
-                                    directionRequests={passengerLocation && destinationLocation ? [{ id: 'passenger-trip-preview', origin: passengerLocation, destination: destinationLocation, color: '#8b5cf6' }] : []}
-                                    center={onlineRiders.find((rider) => rider.uid === selectedNearbyRiderId && hasValidCoordinates(rider.currentLocation))?.currentLocation || passengerLocation || onlineRiders.find((rider) => hasValidCoordinates(rider.currentLocation))?.currentLocation}
-                                    zoom={14}
-                                    height="320px"
-                                    onMarkerClick={(marker) => { if (marker.type === 'nearby' || marker.type === 'rider') setSelectedNearbyRiderId(marker.id); }}
-                                  />
-                                </div>
-                                {selectedNearbyRiderId && (
-                                  <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-500/10 dark:to-indigo-500/10 px-5 py-4 text-sm text-purple-600 dark:text-purple-400 font-semibold border border-purple-100 dark:border-purple-500/20">
-                                    Viewing {onlineRiders.find((rider) => rider.uid === selectedNearbyRiderId)?.name || 'selected rider'} on the map.
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="grid grid-cols-1 gap-4">
-                              {onlineRiders.map((rider) => (
-                                <motion.div
-                                  key={rider.uid}
-                                  initial={{ opacity: 0, x: -20 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  onClick={() => setSelectedNearbyRiderId(rider.uid)}
-                                  className={`bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-5 rounded-[2.5rem] border shadow-xl flex items-center justify-between cursor-pointer transition-all duration-300 ${selectedNearbyRiderId === rider.uid
-                                    ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20 shadow-purple-500/20'
-                                    : 'border-white/20 dark:border-zinc-700/50 hover:border-purple-300 dark:hover:border-purple-700'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                      {rider.avatarUrl ? (
-                                        <img src={rider.avatarUrl} className="w-14 h-14 rounded-2xl object-cover shadow-lg" alt="" />
-                                      ) : (
-                                        <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                          <UserIcon className="w-7 h-7 text-white" />
-                                        </div>
-                                      )}
-                                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 rounded-xl flex items-center justify-center border-2 border-white dark:border-zinc-800 shadow-lg">
-                                        <ShieldCheck className="w-3.5 h-3.5 text-white" />
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <h4 className="font-black text-gray-900 dark:text-white">{rider.name}</h4>
-                                        {profile.favoriteUserIds?.includes(rider.uid) && (
-                                          <Heart className="w-4 h-4 text-red-500 fill-current" />
-                                        )}
-                                      </div>
-                                      <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{rider.vehicleType} • {rider.rating} ★</p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleToggleFavorite(rider.uid); }}
-                                      className={`p-3 rounded-xl transition-all ${profile.favoriteUserIds?.includes(rider.uid)
-                                        ? 'bg-red-50 text-red-500 shadow-lg shadow-red-500/20'
-                                        : 'bg-gray-50 dark:bg-zinc-700 text-gray-400 hover:text-red-500'
-                                        }`}
-                                    >
-                                      <Heart className={`w-5 h-5 ${profile.favoriteUserIds?.includes(rider.uid) ? 'fill-current' : ''}`} />
-                                    </button>
-                                    {rider.phoneNumber && (
-                                      <a
-                                        href={`tel:${rider.phoneNumber}`}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="bg-black dark:bg-white text-white dark:text-black p-3 rounded-xl shadow-xl hover:scale-105 transition-transform"
-                                      >
-                                        <Phone className="w-5 h-5" />
-                                      </a>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Fare Info Card */}
-                        {pickup && destination && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-gradient-to-br from-gray-900 to-black dark:from-zinc-800 dark:to-zinc-900 text-white p-8 rounded-[3rem] flex items-center justify-between shadow-2xl"
-                          >
-                            <div>
-                              <p className="text-sm text-white/50 font-bold uppercase tracking-widest mb-2">Estimated Fare</p>
-                              {isPreparingRoute ? (
-                                <div className="flex items-center gap-3 text-emerald-300">
-                                  <Loader2 className="w-6 h-6 animate-spin" />
-                                  <p className="text-2xl font-black tracking-tight">Calculating route...</p>
-                                </div>
-                              ) : rideEstimate ? (
-                                <>
-                                  <p className="text-4xl font-black tracking-tight">{formatRwf(rideEstimate.fareRwf)}</p>
-                                  {estimatedTripMeta && (
-                                    <p className="mt-3 text-base text-white/50">{estimatedTripMeta}</p>
-                                  )}
-                                </>
-                              ) : (
-                                <p className="text-lg font-bold text-amber-300">Set a clear pickup and destination to calculate the fare.</p>
-                              )}
-                            </div>
-                            <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center shadow-xl border border-emerald-500/30">
-                              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Request Button */}
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleRequestRide}
-                          disabled={!pickup || !destination || isRequesting}
-                          className="w-full bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 text-white py-7 rounded-2xl font-black text-xl disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl shadow-purple-500/30 flex items-center justify-center gap-3 hover:shadow-purple-500/50 transition-all"
-                        >
-                          {isRequesting ? (
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                          ) : (
-                            <>
-                              <Zap className="w-6 h-6" />
-                              {t('requestNow')}
-                            </>
-                          )}
-                        </motion.button>
-
-                        {/* Saved Locations */}
-                        {savedLocations.length > 0 && (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between px-4">
-                              <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">{t('savedLocations')}</h3>
-                              <button
-                                onClick={() => {
-                                  if (destination) { setLocationNameToSave(''); setShowSaveLocationModal(true); }
-                                  else { addNotification('Info', 'Set a destination first to save this location', 'info'); }
-                                }}
-                                className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-xl transition-all hover:scale-105"
-                              >
-                                <Save className="w-5 h-5" />
-                              </button>
-                            </div>
-                            <div className="grid gap-3">
-                              {savedLocations.map((loc) => (
-                                <div
-                                  key={loc.id}
-                                  onClick={() => {
-                                    setDestination(loc.address);
-                                    setDestinationLocation({ lat: loc.lat, lng: loc.lng });
-                                  }}
-                                  className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm p-5 rounded-2xl border border-white/20 dark:border-zinc-700/50 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer flex items-center justify-between group transition-all shadow-lg hover:shadow-xl"
-                                >
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-purple-50 dark:bg-purple-500/10 rounded-2xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all shadow-lg">
-                                      <MapPin className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                      <p className="font-bold text-base text-gray-900 dark:text-white">{loc.name}</p>
-                                      <p className="text-sm text-gray-400 truncate max-w-[250px]">{loc.address}</p>
-                                    </div>
-                                  </div>
+                          {/* Extra: Rider List and Saved Locations */}
+                          <div className="space-y-8 pt-8">
+                            {/* Saved Locations */}
+                            {savedLocations.length > 0 && (
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between px-4">
+                                  <h3 className="text-xs font-black text-gray-400 dark:text-zinc-500 uppercase tracking-[0.2em]">{t('savedLocations')}</h3>
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); handleRemoveSavedLocation(loc.id); }}
-                                    className="p-3 rounded-xl hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 hover:scale-110"
+                                    onClick={() => {
+                                      if (destination && destinationLocation) {
+                                        setLocationToSave({ address: destination, ...destinationLocation });
+                                        setLocationNameToSave('');
+                                        setShowSaveLocationModal(true);
+                                      } else {
+                                        addNotification('Info', 'Set a destination first to save it', 'info');
+                                      }
+                                    }}
+                                    className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-xl transition-all"
                                   >
-                                    <Trash2 className="w-5 h-5" />
+                                    <Save className="w-5 h-5" />
                                   </button>
                                 </div>
-                              ))}
-                            </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {savedLocations.map((loc) => (
+                                    <div
+                                      key={loc.id}
+                                      onClick={() => {
+                                        setDestination(loc.address);
+                                        setDestinationLocation({ lat: loc.lat, lng: loc.lng });
+                                      }}
+                                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm p-5 rounded-[2rem] border border-white/20 dark:border-zinc-700/50 hover:border-purple-300 dark:hover:border-purple-700 cursor-pointer flex items-center justify-between group transition-all"
+                                    >
+                                      <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-purple-50 dark:bg-purple-500/10 rounded-xl flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all shadow-lg">
+                                          <MapPin className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                          <p className="font-bold text-gray-900 dark:text-white">{loc.name}</p>
+                                          <p className="text-xs text-gray-400 truncate max-w-[150px]">{loc.address}</p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleRemoveSavedLocation(loc.id); }}
+                                        className="p-2 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Nearby Drivers Preview */}
+                            {!activeRide && onlineRiders.length > 0 && (
+                              <div className="space-y-4">
+                                <h3 className="text-xs font-black text-gray-400 dark:text-zinc-500 uppercase tracking-[0.2em] px-2">Nearby Drivers</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {onlineRiders.slice(0, 4).map((rider) => (
+                                    <div key={rider.uid} className="bg-white/50 dark:bg-zinc-800/50 backdrop-blur-sm p-4 rounded-[2rem] border border-white/20 dark:border-zinc-700/50 flex items-center gap-4">
+                                      <div className="w-12 h-12 rounded-2xl bg-gray-200 dark:bg-zinc-700 overflow-hidden">
+                                        {rider.photoURL ? <img src={rider.photoURL} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold">R</div>}
+                                      </div>
+                                      <div>
+                                        <p className="font-bold text-gray-900 dark:text-white">{rider.name}</p>
+                                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">{rider.vehicleType} • {rider.rating}★</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
 
                         {/* Save Location Modal */}
                         <AnimatePresence>
@@ -1560,7 +1449,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                                   <MapPinPlus className="w-8 h-8 text-purple-600" />
                                 </div>
                                 <h3 className="text-2xl font-black mb-3 text-gray-900 dark:text-white">Save Location</h3>
-                                <p className="text-gray-500 dark:text-zinc-400 mb-6 truncate">"{destination}"</p>
+                                <p className="text-gray-500 dark:text-zinc-400 mb-6 truncate">"{locationToSave?.address}"</p>
                                 <input
                                   type="text"
                                   value={locationNameToSave}
@@ -1578,10 +1467,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
                                   <motion.button
                                     whileTap={{ scale: 0.95 }}
                                     onClick={() => {
-                                      if (passengerLocation) handleSaveLocation(destination, passengerLocation.lat, passengerLocation.lng);
-                                      else handleSaveLocation(destination, 51.5074, -0.1278);
+                                      if (locationToSave) handleSaveLocation(locationToSave.address, locationToSave.lat, locationToSave.lng);
                                     }}
-                                    disabled={isSavingLocation}
+                                    disabled={isSavingLocation || !locationToSave}
                                     className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-2xl font-bold shadow-xl"
                                   >
                                     {isSavingLocation ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Save'}
@@ -1591,6 +1479,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                             </div>
                           )}
                         </AnimatePresence>
+                        </div>
                       </div>
                     </motion.div>
                   )}
@@ -1600,7 +1489,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[3rem] p-6 shadow-2xl border border-white/20 dark:border-zinc-700/50"
+                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-2xl sm:rounded-[3rem] p-4 sm:p-6 shadow-2xl border border-white/20 dark:border-zinc-700/50"
                     >
                       <TripReport user={user} userRole="passenger" />
                     </motion.div>
@@ -1611,7 +1500,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-[3rem] p-6 shadow-2xl border border-white/20 dark:border-zinc-700/50"
+                      className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl rounded-2xl sm:rounded-[3rem] p-4 sm:p-6 shadow-2xl border border-white/20 dark:border-zinc-700/50"
                     >
                       <TripAnalytics user={user} userRole="passenger" />
                     </motion.div>

@@ -285,16 +285,20 @@ function AppContent() {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        const p = await getUserProfile(user.uid);
-        setProfile(p);
+        // Only subscribe — the first snapshot delivers the profile,
+        // avoiding a redundant getUserProfile() read that doubles quota.
         unsubscribeProfile = subscribeToUserProfile(user.uid, (updatedProfile) => {
           setProfile(updatedProfile);
+          setLoading(false);
         });
+        // Fallback: if the profile doc doesn't exist yet (brand-new user
+        // before createUserProfile completes), stop loading after a timeout.
+        setTimeout(() => setLoading(false), 3000);
       } else {
         setProfile(null);
         if (unsubscribeProfile) { unsubscribeProfile(); unsubscribeProfile = null; }
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => {
       unsubscribeAuth();

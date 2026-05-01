@@ -68,12 +68,13 @@ interface MapComponentProps {
   onMapClick?: (position: { lat: number; lng: number }) => void;
   onPlaceSelected?: (place: Place) => void;
   onRouteSelected?: (route: MapRoute) => void;
+  onRoutesGenerated?: (routes: MapRoute[]) => void;
   height?: string;
   showMapTypeControl?: boolean;
   showRouteControls?: boolean;
 }
 
-const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyA0x1maORlZEkKWdFgxDBuDukI4mOMDlb0';
+const GOOGLE_MAPS_API_KEY = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyDD3klnDaCOHb2HoUFSPeiumFZxMneuA10';
 const GOOGLE_MAPS_MAP_ID = (import.meta as any).env.VITE_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID';
 const MAP_LIBRARIES: ('marker' | 'places')[] = ['marker', 'places'];
 
@@ -101,7 +102,8 @@ export default function MapComponent({
   onRouteSelected,
   height = '400px',
   showMapTypeControl = true,
-  showRouteControls = true
+  showRouteControls = true,
+  onRoutesGenerated
 }: MapComponentProps) {
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite' | 'hybrid'>('hybrid');
@@ -538,7 +540,7 @@ export default function MapComponent({
         background: getMarkerColor(markerData.type),
         borderColor: '#111827',
         glyphColor: '#ffffff',
-        glyph: getMarkerGlyph(markerData.type),
+        glyphText: getMarkerGlyph(markerData.type),
         scale: markerData.type === 'destination' ? 1.1 : 1
       });
 
@@ -669,6 +671,7 @@ export default function MapComponent({
 
           setActiveRouteId(nextActiveRoute.id);
           onRouteSelected?.(nextActiveRoute);
+          onRoutesGenerated?.(allRoutes);
         }
       })
       .catch((error) => {

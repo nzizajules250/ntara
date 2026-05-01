@@ -359,7 +359,8 @@ export function subscribeToOnlineRiders(callback: (riders: UserProfile[]) => voi
   const q = query(
     collection(db, 'users'),
     where('role', '==', 'rider'),
-    where('isOnline', '==', true)
+    where('isOnline', '==', true),
+    limit(50)
   );
   
   return onSnapshot(

@@ -237,7 +237,8 @@ export default function RiderDashboard({ user, profile }: Props) {
     });
 
     return () => { subAvailable(); subMyRides(); };
-  }, [user.uid, addNotification, profile.availabilityRadius, effectiveRiderLocation?.lat, effectiveRiderLocation?.lng, profile.vehicleType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.uid]);
 
   useEffect(() => {
     if (!activeRide) {
@@ -249,6 +250,8 @@ export default function RiderDashboard({ user, profile }: Props) {
 
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
+    let lastUpdateTime = 0;
+    const MIN_UPDATE_INTERVAL_MS = 10000; // Throttle writes to once per 10s
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
@@ -258,10 +261,14 @@ export default function RiderDashboard({ user, profile }: Props) {
           if (distanceFromPinnedLocation < MANUAL_LOCATION_RELEASE_DISTANCE_METERS) return;
         }
         setRiderLocation(liveLocation);
-        updateUserLocation(user.uid, latitude, longitude, { source: 'live' }).catch(console.error);
+        const now = Date.now();
+        if (now - lastUpdateTime >= MIN_UPDATE_INTERVAL_MS) {
+          lastUpdateTime = now;
+          updateUserLocation(user.uid, latitude, longitude, { source: 'live' }).catch(console.error);
+        }
       },
       (error) => { console.error("Error tracking location:", error); },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [user.uid, manualLocationAnchor?.lat, manualLocationAnchor?.lng]);
@@ -348,6 +355,7 @@ export default function RiderDashboard({ user, profile }: Props) {
               height="100%"
               directionRequests={activeRideDirectionRequests}
               freezeViewport={false}
+              showMapTypeControl={false}
               showRouteControls={false}
             />
           ) : (
@@ -653,32 +661,41 @@ export default function RiderDashboard({ user, profile }: Props) {
       </motion.div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 p-1.5 bg-gray-100 dark:bg-zinc-800 rounded-2xl">
-        {[
-          { key: 'ride' as const, label: 'Rides', icon: Navigation },
-          { key: 'reports' as const, label: 'Reports', icon: FileText },
-          { key: 'analytics' as const, label: 'Analytics', icon: BarChart3 }
-        ].map((tab) => (
-          <motion.button
-            key={tab.key}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setViewMode(tab.key)}
-            className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${viewMode === tab.key ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-lg' : 'text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'}`}
-          >
-            <tab.icon className="w-4 h-4" />
-            <span className="hidden sm:inline">{tab.label}</span>
-          </motion.button>
-        ))}
+      <div className="flex bg-gray-100 dark:bg-zinc-800 p-1.5 rounded-2xl mb-6">
+        <button 
+          onClick={() => setViewMode('ride')} 
+          className={`flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${viewMode === 'ride' ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'}`}
+        >
+          {t('rides') || 'Rides'}
+        </button>
+        <button 
+          onClick={() => setViewMode('reports')} 
+          className={`flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${viewMode === 'reports' ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'}`}
+        >
+          {t('reports') || 'Reports'}
+        </button>
+        <button 
+          onClick={() => setViewMode('analytics')} 
+          className={`flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${viewMode === 'analytics' ? 'bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500'}`}
+        >
+          {t('analytics') || 'Analytics'}
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
         {viewMode === 'ride' && (
-          <motion.div key="ride-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+          <motion.div 
+            key="ride-view" 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -10 }} 
+            className="space-y-6"
+          >
             {/* Availability Radius */}
-            <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 shadow-sm border border-gray-100 dark:border-zinc-800">
+            <div className="bg-white dark:bg-zinc-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-zinc-800">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center">
                     <Target className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div>
