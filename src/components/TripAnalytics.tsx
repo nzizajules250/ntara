@@ -5,7 +5,7 @@ import { BarChart3, TrendingUp, User as UserIcon, Loader2, AlertCircle, DollarSi
 import { motion } from 'motion/react';
 import { formatRwf } from '../lib/fareUtils';
 import { useLanguage } from '../lib/i18n';
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, getDoc, limit } from 'firebase/firestore';
 
 interface TripAnalyticsProps {
   user: FirebaseUser;
@@ -57,14 +57,16 @@ export default function TripAnalytics({ user, userRole }: TripAnalyticsProps) {
             where('passengerId', '==', user.uid),
             where('status', '==', 'completed'),
             where('completedAt', '>=', startDate),
-            orderBy('completedAt', 'desc')
+            orderBy('completedAt', 'desc'),
+            limit(100)
           )
         : query(
             collection(db, 'rides'),
             where('riderId', '==', user.uid),
             where('status', '==', 'completed'),
             where('completedAt', '>=', startDate),
-            orderBy('completedAt', 'desc')
+            orderBy('completedAt', 'desc'),
+            limit(100)
           );
 
       const snapshot = await getDocs(q);

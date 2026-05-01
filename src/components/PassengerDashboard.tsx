@@ -153,6 +153,40 @@ export default function PassengerDashboard({ user, profile }: Props) {
     return buildRideEstimate(distanceMeters, durationSeconds);
   };
 
+  // Sync passenger location to Firestore during active rides
+  useEffect(() => {
+    if (!activeRide || !['requested', 'accepted', 'arrived', 'ongoing'].includes(activeRide.status)) return;
+
+    let watchId: number | null = null;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          const newLocation = { lat: latitude, lng: longitude };
+          
+          // Update local state
+          setPassengerLocation(newLocation);
+          
+          // Update Firestore for the rider to see
+          try {
+            await updateDoc(doc(db, 'users', user.uid), {
+              currentLocation: newLocation,
+              updatedAt: serverTimestamp()
+            });
+          } catch (error) {
+            console.error("Failed to sync passenger location:", error);
+          }
+        },
+        (error) => console.error("Location watch error:", error),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [activeRide?.id, activeRide?.status, user.uid]);
+
   const handleSaveLocation = async (address: string, lat: number, lng: number) => {
     if (!locationNameToSave.trim()) { addNotification('Error', 'Please enter a name for this location', 'error'); return; }
     setIsSavingLocation(true);
@@ -648,6 +682,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
         </div>
       </motion.div>
     );
+  }
 
   const ridePickupLocation = activeRide ? (passengerLocation || (hasValidCoordinates(activeRide.pickup) ? { lat: activeRide.pickup.lat, lng: activeRide.pickup.lng } : null)) : null;
   const focusedNearbyDriver = activeRide ? (nearbyDrivers.find((driver) => driver.uid === selectedNearbyRiderId && hasValidCoordinates(driver.currentLocation)) || null) : null;
@@ -698,9 +733,9 @@ export default function PassengerDashboard({ user, profile }: Props) {
                       {activeRide ? (
                         <>
                           {/* ADAPTIVE LAYOUT: Map-First Approach for Active Ride */}
-                          <div className="relative -mx-2 sm:-mx-3 -mt-2 sm:-mt-3 min-h-[calc(100vh-10rem)] md:min-h-0 md:h-[calc(100vh-12rem)] md:m-0 overflow-hidden bg-slate-50 dark:bg-slate-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem] md:rounded-[3rem] transition-all duration-500">
+                          <div className={`relative -mx-2 sm:-mx-3 -mt-2 sm:-mt-3 md:m-0 overflow-hidden bg-slate-50 dark:bg-slate-950 sm:mx-0 sm:mt-0 sm:rounded-[2rem] md:rounded-[3rem] transition-all duration-500 flex flex-col ${isCardExpanded ? 'min-h-screen md:min-h-0 md:h-auto' : 'min-h-[calc(100vh-10rem)] md:min-h-0 md:h-[calc(100vh-12rem)]'}`}>
                             {/* Full-Screen Map Background */}
-                            <div className="absolute inset-0 w-full h-full overflow-hidden">
+                            <div className={`${isCardExpanded ? 'relative h-[45vh] md:h-[55vh]' : 'absolute inset-0 h-full'} w-full overflow-hidden transition-all duration-500 z-0`}>
                               {ridePickupLocation ? (
                                 <MapComponent
                                   markers={[
@@ -829,7 +864,7 @@ export default function PassengerDashboard({ user, profile }: Props) {
                                   animate={{ y: 0, opacity: 1 }}
                                   exit={{ y: "100%", opacity: 0 }}
                                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                  className="absolute bottom-0 left-0 right-0 md:left-auto md:right-4 md:top-4 md:bottom-4 md:w-[480px] md:max-h-none overflow-y-auto rounded-t-[3rem] md:rounded-[3rem] border border-white/20 bg-white/95 shadow-2xl backdrop-blur-3xl dark:bg-zinc-900/95 z-20 custom-scrollbar"
+                                  className={`md:relative md:top-0 md:right-0 md:bottom-0 md:w-full rounded-t-[3rem] md:rounded-b-[3rem] md:rounded-t-none border border-white/20 bg-white/95 shadow-2xl backdrop-blur-3xl dark:bg-zinc-900/95 z-20 custom-scrollbar ${isCardExpanded ? 'relative flex-1' : 'absolute bottom-0 left-0 right-0'}`}
                                 >
                                   <div className="sticky top-0 z-10 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md pt-5 pb-3 px-8 flex flex-col items-center border-b border-gray-100 dark:border-zinc-800">
                                     <div className="h-1.5 w-16 rounded-full bg-gray-300 dark:bg-zinc-700 mb-5" />

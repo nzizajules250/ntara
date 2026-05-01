@@ -5,7 +5,7 @@ import { Download, Calendar, Filter, Loader2, AlertCircle, MapPin, Clock, Dollar
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../lib/i18n';
 import { formatDistanceKm, formatRwf } from '../lib/fareUtils';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, limit } from 'firebase/firestore';
 
 interface TripReportProps {
   user: FirebaseUser;
@@ -50,7 +50,8 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
             where('status', '==', 'completed'),
             where('completedAt', '>=', startDate),
             where('completedAt', '<=', endDate),
-            orderBy('completedAt', 'desc')
+            orderBy('completedAt', 'desc'),
+            limit(100)
           )
         : query(
             collection(db, 'rides'),
@@ -58,7 +59,8 @@ export default function TripReport({ user, userRole, passengerId, riderId }: Tri
             where('status', '==', 'completed'),
             where('completedAt', '>=', startDate),
             where('completedAt', '<=', endDate),
-            orderBy('completedAt', 'desc')
+            orderBy('completedAt', 'desc'),
+            limit(100)
           );
 
       const snapshot = await getDocs(q);

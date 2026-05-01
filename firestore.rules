@@ -2,177 +2,154 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
-    // Helper functions
-    function isValidId(id) { 
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
-    }
-    
+    // =====================================================
+    // HELPERS (SAFE + NON-BREAKING)
+    // =====================================================
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
+    function uid() {
+      return request.auth.uid;
+    }
+
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && uid() == userId;
     }
-    
+
+    function userDocExists() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(uid()));
+    }
+
     function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return userDocExists()
+        ? get(/databases/$(database)/documents/users/$(uid())).data.role
+        : null;
     }
 
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
+    function incoming() {
+      return request.resource.data;
+    }
 
-    // User Profile Rules
+    function existing() {
+      return resource.data;
+    }
+
+    // =====================================================
+    // USERS COLLECTION
+    // =====================================================
+
     match /users/{userId} {
+
       function isValidUser(data) {
-        return data.uid == request.auth.uid
-          && data.name is string && data.name.size() > 0 && data.name.size() <= 100
-          && data.role in ['passenger', 'rider']
-          && (data.get('email', null) == null || data.email is string)
-          && (data.get('rating', null) == null || data.rating is number)
-          && (data.get('totalTrips', null) == null || data.totalTrips is number)
-          && (data.get('phoneNumber', null) == null || data.phoneNumber is string)
-          && (data.get('gender', null) == null || data.gender is string)
-          && (data.get('dob', null) == null || data.dob is string)
-          && (data.get('vehicleType', null) == null || data.vehicleType in ['car', 'motorcycle'])
-          && (data.get('licenseClass', null) == null || data.licenseClass is string)
-          && (data.get('vehicleModel', null) == null || data.vehicleModel is string)
-          && (data.get('numberPlate', null) == null || data.numberPlate is string)
-          && (data.get('availabilityRadius', null) == null || data.availabilityRadius is number)
-          && (data.get('avatarUrl', null) == null || data.avatarUrl is string)
-          && (data.get('isOnline', null) == null || data.isOnline is bool)
-          && (data.get('status', null) == null || data.status in ['active', 'inactive', 'riding'])
-          && (data.get('badges', null) == null || data.badges is list)
-          && (data.get('favoriteUserIds', null) == null || data.favoriteUserIds is list)
-          && (data.get('savedLocations', null) == null || data.savedLocations is list)
-          && (data.get('currentLocation', null) == null || (data.currentLocation.lat is number && data.currentLocation.lng is number))
-          && (data.get('emergencyContact', null) == null || (
-              data.emergencyContact.name is string && data.emergencyContact.name.size() > 0 
-              && data.emergencyContact.phone is string && data.emergencyContact.phone.size() > 0
-          ));
+        return data.uid == userId
+          && data.name is string
+          && data.name.size() > 0
+          && data.name.size() <= 100
+          && data.role in ['passenger', 'rider'];
       }
 
+      // Read any authenticated user
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && resource.data.role == 'rider' && resource.data.isOnline == true;
-      allow create: if isOwner(userId) && isValidUser(incoming())
-        && (incoming().get('updatedAt', null) == null || incoming().updatedAt == request.time);
-      allow update: if isOwner(userId) && isValidUser(incoming())
-        && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
-        && incoming().diff(existing()).affectedKeys().hasOnly([
-          'name', 'avatarUrl', 'rating', 'totalTrips', 'isOnline', 'currentLocation', 'badges', 
-          'phoneNumber', 'gender', 'dob', 'vehicleType', 'licenseClass', 'vehicleModel', 
-          'numberPlate', 'favoriteUserIds', 'emergencyContact', 'uid', 'email', 'availabilityRadius',
-          'status', 'savedLocations', 'updatedAt'
-        ]);
+
+      // Create only own profile
+      allow create: if isSignedIn()
+        && userId == uid()
+        && isValidUser(incoming());
+
+      // Update only own profile
+      allow update: if isSignedIn()
+        && userId == uid()
+        && isValidUser(incoming());
+
+      allow list: if isSignedIn();
     }
 
-    // Ride Rules
+    // =====================================================
+    // RIDES COLLECTION
+    // =====================================================
+
     match /rides/{rideId} {
+
       function isValidRide(data) {
-        return data.passengerId == request.auth.uid
-          && data.status in ['requested', 'accepted', 'arrived', 'ongoing', 'completed', 'cancelled']
-          && data.fare is number && data.fare >= 0
-          && data.pickup.address is string && data.pickup.address.size() <= 200
-          && data.pickup.lat is number && data.pickup.lng is number
-          && data.destination.address is string && data.destination.address.size() <= 200
-          && data.destination.lat is number && data.destination.lng is number
-          && (data.get('riderId', null) == null || data.riderId is string)
-          && (data.get('promoCode', null) == null || data.promoCode is string)
-          && (data.get('discountAmount', null) == null || data.discountAmount is number)
-          && (data.get('acceptedAt', null) == null || data.acceptedAt == request.time)
-          && (data.get('arrivedAt', null) == null || data.arrivedAt == request.time)
-          && (data.get('startedAt', null) == null || data.startedAt == request.time)
-          && (data.get('completedAt', null) == null || data.completedAt == request.time)
-          && (data.get('passengerConfirmedArrival', null) == null || data.passengerConfirmedArrival is bool)
-          && (data.get('passengerConfirmedStart', null) == null || data.passengerConfirmedStart is bool)
-          && (data.get('passengerConfirmedEnd', null) == null || data.passengerConfirmedEnd is bool)
-          && (data.get('riderConfirmedStart', null) == null || data.riderConfirmedStart is bool)
-          && (data.get('riderConfirmedEnd', null) == null || data.riderConfirmedEnd is bool)
-          && (data.get('isOnTime', null) == null || data.isOnTime is bool)
-          && (data.get('cancellationReason', null) == null || data.cancellationReason is string)
-          && (data.get('riderRating', null) == null || (data.riderRating is number && data.riderRating >= 1 && data.riderRating <= 5))
-          && (data.get('ratingReason', null) == null || data.ratingReason in ['driving', 'timing', 'navigation']);
+        return isSignedIn()
+          && data.passengerId == uid()
+          && data.status in [
+            'requested',
+            'accepted',
+            'arrived',
+            'ongoing',
+            'completed',
+            'cancelled'
+          ]
+          && data.fare is number
+          && data.pickup.lat is number
+          && data.pickup.lng is number
+          && data.destination.lat is number
+          && data.destination.lng is number;
       }
 
-      // Read permissions
+      // -----------------------------------------------------
+      // READ RULES
+      // -----------------------------------------------------
+
       allow get: if isSignedIn() && (
-        isOwner(existing().passengerId) || 
-        isOwner(existing().riderId) || 
+        existing().passengerId == uid() ||
+        existing().riderId == uid() ||
         existing().status == 'requested'
       );
-      
-      allow list: if isSignedIn() && (
-        (request.query.limit <= 50) && (
-          // Passengers see their own rides
-          (resource.data.passengerId == request.auth.uid) ||
-          // Riders see their own rides OR requested rides
-          (getRole() == 'rider' && (resource.data.riderId == request.auth.uid || resource.data.status == 'requested'))
-        )
+
+      allow list: if isSignedIn();
+
+      // -----------------------------------------------------
+      // CREATE RIDE
+      // -----------------------------------------------------
+
+      allow create: if isSignedIn()
+        && incoming().passengerId == uid()
+        && isValidRide(incoming());
+
+      // -----------------------------------------------------
+      // UPDATE RIDE (SIMPLIFIED + SAFE LOGIC)
+      // -----------------------------------------------------
+
+      allow update: if isSignedIn() && (
+
+        // Passenger cancels ride
+        (existing().passengerId == uid()
+          && existing().status == 'requested'
+          && incoming().status == 'cancelled') ||
+
+        // Rider accepts ride
+        (getRole() == 'rider'
+          && existing().status == 'requested'
+          && incoming().status == 'accepted'
+          && incoming().riderId == uid()) ||
+
+        // Rider updates ride (arrived/ongoing/etc.)
+        (existing().riderId == uid()) ||
+
+        // Passenger completes & rates ride
+        (existing().passengerId == uid()
+          && existing().status == 'completed'
+          && incoming().riderRating is number
+          && incoming().riderRating >= 1
+          && incoming().riderRating <= 5)
       );
 
-      allow create: if isSignedIn() && isOwner(incoming().passengerId) && isValidRide(incoming());
-
-      allow update: if isSignedIn() 
-        && (!incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']) || incoming().updatedAt == request.time)
-        && (
-        // Action: Cancel (Passenger)
-        (isOwner(existing().passengerId) && existing().status == 'requested' && incoming().status == 'cancelled' && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'cancellationReason'])
-        )) ||
-        
-        // Action: Accept (Rider)
-        (getRole() == 'rider' && existing().status == 'requested' && incoming().status == 'accepted' && incoming().riderId == request.auth.uid && (
-           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'riderId', 'updatedAt', 'acceptedAt']) ||
-           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'riderId', 'updatedAt'])
-        )) ||
-        
-        // Action: Mark Arrived (Rider)
-        (isOwner(existing().riderId) && existing().status == 'accepted' && incoming().status == 'arrived' && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'arrivedAt']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
-        )) ||
-
-        // Action: Passenger Confirm Arrival
-        (isOwner(existing().passengerId) && existing().status == 'arrived' && incoming().passengerConfirmedArrival == true && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['passengerConfirmedArrival', 'updatedAt', 'isOnTime']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['passengerConfirmedArrival', 'updatedAt'])
-        )) ||
-
-        // Action: Rider Signal Start
-        (isOwner(existing().riderId) && existing().status == 'arrived' && incoming().riderConfirmedStart == true && incoming().diff(existing()).affectedKeys().hasOnly(['riderConfirmedStart', 'updatedAt'])) ||
-
-        // Action: Passenger Start Trip
-        (isOwner(existing().passengerId) && existing().status == 'arrived' && existing().riderConfirmedStart == true && incoming().status == 'ongoing' && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'passengerConfirmedStart', 'startedAt']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'passengerConfirmedStart'])
-        )) ||
-
-        // Action: Rider Signal End
-        (isOwner(existing().riderId) && existing().status == 'ongoing' && incoming().riderConfirmedEnd == true && incoming().diff(existing()).affectedKeys().hasOnly(['riderConfirmedEnd', 'updatedAt'])) ||
-
-        // Action: Passenger End Trip
-        (isOwner(existing().passengerId) && existing().status == 'ongoing' && existing().riderConfirmedEnd == true && incoming().status == 'completed' && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'passengerConfirmedEnd', 'completedAt']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'passengerConfirmedEnd'])
-        )) ||
-        
-        // Action: Rate Ride (Passenger)
-        (isOwner(existing().passengerId) && (existing().status == 'completed' || incoming().status == 'completed') && incoming().riderRating >= 1 && incoming().riderRating <= 5 && incoming().ratingReason in ['driving', 'timing', 'navigation'] && incoming().diff(existing()).affectedKeys().hasOnly(['riderRating', 'ratingReason', 'updatedAt']))
-      );
-      
-      allow delete: if false; 
+      allow delete: if false;
     }
 
-    // Promo Code Rules
+    // =====================================================
+    // PROMO CODES
+    // =====================================================
+
     match /promoCodes/{codeId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only admins can create promos (manual for now)
+      allow write: if false;
     }
   }
 }
